@@ -3,6 +3,7 @@ import {
 } from 'react';
 import { AnimatePresence, motion, useDragControls, useIsPresent } from 'motion/react';
 import { ESTADOS_EQUIPO, ESTADOS_PRESTAMO } from '../util/formato.js';
+import { IconoInfo } from './Iconos.jsx';
 import { RESORTE, RESORTE_HOJA, proyectar } from '../util/movimiento.js';
 
 export function useConsultaMedia(consulta) {
@@ -57,16 +58,28 @@ export function EstadoPrestamo({ estado }) {
   return <span className={`pildora ${TONO_PRESTAMO[estado]}`}>{ESTADOS_PRESTAMO[estado]}</span>;
 }
 
-/** Título de la pantalla: un sustantivo, la línea del hallazgo debajo y las acciones reales a la derecha. */
-export function Titulo({ titulo, hallazgo, children }) {
+/**
+ * Encabezado de página al estilo de Notion: ícono de página, título, una línea de contexto y las acciones reales.
+ * El callout (bloque destacado) lleva lo que hay que leer primero: el hallazgo del día o el cupo del estudiante.
+ */
+export function Titulo({ titulo, icono, hallazgo, callout, children }) {
   return (
-    <div className="titulo">
-      <div>
-        <h1>{titulo}</h1>
-        {hallazgo && <p className="hallazgo">{hallazgo}</p>}
+    <>
+      <div className="titulo">
+        <div>
+          {icono && <span className="pagina-icono" aria-hidden="true">{icono}</span>}
+          <h1>{titulo}</h1>
+          {hallazgo && <p className="hallazgo">{hallazgo}</p>}
+        </div>
+        {children && <div className="titulo-acciones">{children}</div>}
       </div>
-      {children && <div className="titulo-acciones">{children}</div>}
-    </div>
+      {callout && (
+        <div className={`callout ${callout.tono ?? ''}`} role="status">
+          <IconoInfo />
+          <div>{callout.contenido}</div>
+        </div>
+      )}
+    </>
   );
 }
 

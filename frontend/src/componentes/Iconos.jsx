@@ -36,18 +36,22 @@ export const IconoMenu = () => (
   <svg {...base}><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" /></svg>
 );
 
+export const IconoInfo = () => (
+  <svg {...base}><circle cx="8" cy="8" r="6" /><path d="M8 7.2v3.6M8 5.2v.1" /></svg>
+);
+
 export const IconoActualizar = () => (
   <svg {...base}><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" /></svg>
 );
 
-/** Marca de PrestaLab: un matraz de laboratorio sobre el tono de datos. */
+/** Marca de PrestaLab: un matraz de laboratorio, en tinta como la marca de Notion. */
 export function Marca({ tamano = 28 }) {
   return (
     <svg width={tamano} height={tamano} viewBox="0 0 28 28" aria-hidden="true">
-      <rect width="28" height="28" rx="7" fill="var(--dato)" />
+      <rect width="28" height="28" rx="7" fill="var(--marca-fondo)" />
       <path d="M11.5 6.5h5M12.5 6.5v5.2L8 19.6a1.6 1.6 0 0 0 1.4 2.4h9.2a1.6 1.6 0 0 0 1.4-2.4l-4.5-7.9V6.5"
-            fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M10 17.5h8" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+            fill="none" stroke="var(--marca-trazo)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 17.5h8" stroke="var(--marca-trazo)" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }

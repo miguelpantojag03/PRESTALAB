@@ -5,11 +5,10 @@ import { MotionConfig } from 'motion/react';
 import App from './App.jsx';
 import { ProveedorSesion } from './auth/Sesion.jsx';
 import { ProveedorAvisos } from './componentes/Comunes.jsx';
-// IBM Plex, servida desde el propio contenedor: la tipografía asignada por el estilo se carga de verdad.
-import '@fontsource/ibm-plex-sans/400.css';
-import '@fontsource/ibm-plex-sans/500.css';
-import '@fontsource/ibm-plex-sans/600.css';
-import '@fontsource/ibm-plex-mono/400.css';
+// Inter, servida desde el propio contenedor: es el respaldo que el DESIGN.md de Notion indica para Notion Sans.
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
 import './estilos.css';
 
 // reducedMotion="user": con "reducir movimiento" activado en el sistema, Motion quita desplazamientos y escalas

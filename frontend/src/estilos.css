@@ -1,81 +1,91 @@
 /*
- * Sistema visual de PrestaLab: estilo "Framed sheet" de tasteskill (pantallas de aplicación), seed 1664243803.
- * Un marco teñido en L (la barra lateral) sostiene el trabajo, que va en una hoja blanca con borde de 1px,
- * esquinas de 16px y sin sombra. El color va en los datos, no en el chrome: el primario es casi negro y el único
- * tono (--dato) marca lo que el administrador sigue con la vista (lo que está prestado, el estado elegido).
- * Notas y retícula: .taste-skill/notas.md. El movimiento (resortes, hoja, avisos) está en util/movimiento.js.
+ * Sistema visual de PrestaLab tomado del DESIGN.md de Notion (VoltAgent/awesome-design-md).
+ * Se usan sus tokens: lienzo blanco, barra lateral #f6f5f4, bordes cálidos #e5e3df, tinta #37352f, el violeta
+ * #5645d4 solo para la acción principal, botones rectangulares de 8px, tarjetas de 12px, etiquetas pastel como las
+ * propiedades de sus bases de datos y la banda azul marino con puntos de colores en el acceso.
+ * Ajustes propios, anotados donde aparecen:
+ * - "Notion Sans" es privada: se usa Inter, el respaldo que indica el propio documento.
+ * - El texto de las etiquetas usa el tono profundo de cada familia para llegar a 4.5:1 (el verde #1aae39 sobre menta
+ *   da 2.6:1).
+ * - El documento no trae modo oscuro ("Known Gaps"): se extrapola de los grises cálidos de la app de Notion.
+ * El movimiento (resortes, hoja, avisos) sigue en util/movimiento.js.
  */
 
 :root {
-  /* La cara: el marco toma el gris verdoso frío de los mesones del laboratorio; la hoja sigue blanca. */
-  --marco: #f3f6f5;
-  --hoja: #ffffff;
-  --elevado: #f4f6f8;
-  --activo: #e8ecea;
-  --borde: #e8eaec;
-  --regla: #f0f1f2;
-  --control: #cdced1;
-  --texto: #131416;
-  --tenue: #5d5f60;
-  --debil: #6b6b6b;
-  --primario: #1d1f20;
-  --primario-tinta: #ffffff;
-  --dato: #1b6c80;
-  --dato-palido: #e6f0f2;
-  --dato-tinta: #0f4552;
-  --dato-sobre: #ffffff;
-  --positivo: #1e7b4f;
-  --negativo: #c4242a;
-  --pildora-pos-fondo: #dcfae5; --pildora-pos-tinta: #04250e;
-  --pildora-neg-fondo: #ffedea; --pildora-neg-tinta: #831c1e;
-  --pildora-aviso-fondo: #fffbeb; --pildora-aviso-tinta: #92400e;
-  --pildora-neutra-fondo: #ebedee; --pildora-neutra-tinta: #353736;
+  --lienzo: #ffffff;
+  --superficie: #f6f5f4;
+  --superficie-suave: #fafaf9;
+  --linea: #e5e3df;
+  --linea-suave: #ede9e4;
+  --linea-fuerte: #c8c4be;
+  --hover: rgb(55 53 47 / 6%);
+  --seleccion: rgb(55 53 47 / 9%);
 
-  --fuente: "IBM Plex Sans", Inter, system-ui, sans-serif;
-  --fuente-mono: "IBM Plex Mono", ui-monospace, monospace; /* taste-skill-ignore: mono solo para códigos de inventario y números de préstamo (IDs), según la hoja del estilo */
-  --fs-titulo: 22px; --fs-seccion: 16px; --fs-kpi: 28px; --fs-cuerpo: 14px; --fs-chica: 12px;
+  --tinta: #1a1a1a;
+  --carbon: #37352f;
+  --pizarra: #5d5b54;
+  --acero: #6f6d67;           /* #787671 del documento, oscurecido para llegar a 4.5:1 sobre blanco */
 
-  --ancho-lateral: 228px;
-  --margen-hoja: 8px;
-  --radio-hoja: 16px;
-  --radio-tarjeta: 8px;
-  --radio-control: 6px;
-  --hueco: 24px;
-  --relleno: 24px;
-  --relleno-tarjeta: 20px;
-  --alto-control: 32px;
-  --alto-fila: 48px;
+  --primario: #5645d4;
+  --primario-presionado: #4534b3;
+  --sobre-primario: #ffffff;
+  --enlace: #0075de;
+  --error: #c92a2a;
 
-  --t-hover: 150ms;
-  --t-presion: 120ms;
+  --marino: #0a1530;
+  --marca-fondo: #37352f;
+  --marca-trazo: #ffffff;
+
+  /* Etiquetas: tinte pastel con el tono profundo de la misma familia. */
+  --menta: #d9f3e1;     --menta-tinta: #1c6b31;
+  --cielo: #dcecfa;     --cielo-tinta: #005bab;
+  --durazno: #ffe8d4;   --durazno-tinta: #793400;
+  --rosa: #fde0ec;      --rosa-tinta: #a02e6d;
+  --amarillo: #fef7d6;  --amarillo-tinta: #523410;
+  --gris: #f0eeec;      --gris-tinta: #37352f;
+
+  --sombra-modal: 0 16px 48px -8px rgb(15 15 15 / 16%);
+  --sombra-flotante: 0 4px 12px rgb(15 15 15 / 8%);
+
+  --fuente: Inter, -apple-system, system-ui, "Segoe UI", Helvetica, sans-serif;
+  --fuente-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radio-etiqueta: 6px;
+  --radio-boton: 8px;
+  --radio-tarjeta: 12px;
+  --ancho-lateral: 240px;
   color-scheme: light;
 }
 
-/* Oscuro: neutros verdaderos, elevación por luminosidad (valores por defecto de la skill). */
+/* Oscuro: extrapolado de los grises cálidos de la app de Notion (el DESIGN.md no lo documenta). */
 @media (prefers-color-scheme: dark) {
   :root {
-    --marco: #0a0b0b;
-    --hoja: #121414;
-    --elevado: #1b1d1d;
-    --activo: #242727;
-    --borde: #2a2d2d;
-    --regla: #1e2121;
-    --control: #4a4d4d;
-    --texto: #ffffff;
-    --tenue: #b4b4b4;
-    --debil: #949494;
-    --primario: #ffffff;
-    --primario-tinta: #000000;
-    --dato: #4fb6cc;
-    --dato-palido: #12292f;
-    --dato-tinta: #8fd3e2;
-    --dato-sobre: #062a33;
-    --positivo: #3fc07a;
-    --negativo: #e5566f;
-    --pildora-pos-fondo: #172a1d; --pildora-pos-tinta: #3fc07a;
-    --pildora-neg-fondo: #2c1a20; --pildora-neg-tinta: #e5566f;
-    --pildora-aviso-fondo: #2b2414; --pildora-aviso-tinta: #e5a93b;
-    --pildora-neutra-fondo: #242727; --pildora-neutra-tinta: #e6e6e6;
+    --lienzo: #191919;
+    --superficie: #202020;
+    --superficie-suave: #1d1d1d;
+    --linea: #2f2f2f;
+    --linea-suave: #282828;
+    --linea-fuerte: #454545;
+    --hover: rgb(255 255 255 / 5%);
+    --seleccion: rgb(255 255 255 / 8%);
+    --tinta: #f2f2f0;
+    --carbon: #e3e2e0;
+    --pizarra: #b0afac;
+    --acero: #9b9a97;
+    --primario: #6d5ee8;
+    --primario-presionado: #5645d4;
+    --enlace: #529cca;
+    --error: #ff7b7b;
+    --marca-fondo: #e3e2e0;
+    --marca-trazo: #191919;
+    --menta: #1f3a29;     --menta-tinta: #8fdba7;
+    --cielo: #1c3349;     --cielo-tinta: #8cc4ff;
+    --durazno: #43311f;   --durazno-tinta: #ffb77d;
+    --rosa: #46222f;      --rosa-tinta: #ff9ccb;
+    --amarillo: #3f3519;  --amarillo-tinta: #f2d36b;
+    --gris: #2c2c2b;      --gris-tinta: #e3e2e0;
+    --sombra-modal: 0 16px 48px -8px rgb(0 0 0 / 55%);
+    --sombra-flotante: 0 4px 12px rgb(0 0 0 / 40%);
     color-scheme: dark;
   }
 }
@@ -83,24 +93,36 @@
 /* ---------- base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
 body {
   margin: 0;
-  background: var(--marco);
-  color: var(--texto);
-  font: var(--fs-cuerpo)/20px var(--fuente);
+  background: var(--lienzo);
+  color: var(--carbon);
+  font: 400 15px/1.55 var(--fuente);
   -webkit-font-smoothing: antialiased;
 }
+
 h1, h2, h3, p, ul, ol { margin: 0; }
 ul[class], ol[class] { padding: 0; list-style: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
-a { color: inherit; }
-:focus-visible { outline: 2px solid var(--dato); outline-offset: 2px; border-radius: 4px; }
+a { color: var(--enlace); text-decoration: none; }
+:focus-visible { outline: 2px solid var(--primario); outline-offset: 2px; border-radius: 4px; }
 .num, table, .kpi-valor, .conteo-valor { font-variant-numeric: tabular-nums; }
-.mono { font-family: var(--fuente-mono); font-size: 13px; white-space: nowrap; } /* taste-skill-ignore: mono solo para IDs */
-.tenue { color: var(--tenue); }
+.tenue { color: var(--pizarra); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* ---------- el marco en L y la hoja ---------- */
+/* Código de inventario como el código en línea de Notion: monoespaciado sobre un gris cálido. */
+.mono {
+  font-family: var(--fuente-mono);
+  font-size: 0.85em;
+  white-space: nowrap;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--gris);
+  color: var(--carbon);
+}
+
+/* ---------- la aplicación: barra lateral y página ---------- */
 .app {
   display: grid;
   grid-template-columns: var(--ancho-lateral) minmax(0, 1fr);
@@ -113,60 +135,53 @@ a { color: inherit; }
   height: 100svh;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 16px 12px;
+  gap: 1px;
+  padding: 12px 8px;
   overflow: auto;
+  background: var(--superficie);
+  border-right: 1px solid var(--linea);
 }
 
-/* La marca del producto y su alcance arriba de la barra: la pantalla dice de quién es. */
 .marca {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 8px 20px;
-  text-decoration: none;
+  padding: 6px 10px 18px;
+  color: var(--tinta);
 }
 
 .marca svg { flex: none; }
-
-.marca strong {
-  display: block;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
-}
-
-.marca small {
-  display: block;
-  font-size: var(--fs-chica);
-  line-height: 16px;
-  color: var(--tenue);
-}
+.marca strong { display: block; font-size: 14px; font-weight: 600; line-height: 20px; }
+.marca small { display: block; font-size: 12px; line-height: 16px; color: var(--pizarra); }
 
 .menu-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 32px;
-  padding: 0 8px;
-  border-radius: 8px;
-  color: var(--tenue);
-  text-decoration: none;
-  transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--pizarra);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
 .menu-item svg { width: 16px; height: 16px; flex: none; }
-.menu-item:hover { background: var(--elevado); color: var(--texto); }
+.menu-item:hover { background: var(--hover); color: var(--carbon); }
+.menu-item.active { background: var(--seleccion); color: var(--tinta); }
 
-/* Ítem activo: píldora gris neutra; el texto no cambia de color de marca. */
-.menu-item.active { background: var(--activo); color: var(--texto); }
-
-/* Conteo solo en una cola que pide acción: "Préstamos 4" (solicitudes por aprobar). */
 .menu-cuenta {
   margin-left: auto;
-  font-size: var(--fs-chica);
-  font-variant-numeric: tabular-nums;
-  color: var(--texto);
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--primario);
+  color: var(--sobre-primario);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
 }
 
 .lateral-pie {
@@ -174,54 +189,86 @@ a { color: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 8px 4px;
+  padding: 10px;
+  border-top: 1px solid var(--linea);
 }
 
 .lateral-pie .persona { flex: 1; min-width: 0; line-height: 18px; }
-.lateral-pie .persona strong { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lateral-pie .persona small { color: var(--tenue); font-size: var(--fs-chica); }
+.lateral-pie .persona strong { display: block; font-size: 14px; font-weight: 500; color: var(--tinta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lateral-pie .persona small { color: var(--pizarra); font-size: 12px; }
 
-/* La hoja de trabajo: blanca, separada 8px del borde derecho e inferior, 1px de borde y sin sombra. */
+/* La página: una columna centrada con aire, como una página de Notion. */
 .hoja-trabajo {
   min-width: 0;
-  margin: var(--margen-hoja) var(--margen-hoja) var(--margen-hoja) 0;
-  padding: var(--relleno);
-  background: var(--hoja);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-hoja);
-  min-height: calc(100svh - 2 * var(--margen-hoja));
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 44px 48px 96px;
 }
 
 .barra-movil { display: none; }
 
-/* ---------- título de la pantalla ---------- */
+/* ---------- encabezado de la página ---------- */
 .titulo {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: var(--hueco);
+  margin-bottom: 28px;
 }
+
+/* El ícono de página de Notion, sobre el título. */
+.pagina-icono {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 14px;
+  border-radius: var(--radio-tarjeta);
+  background: var(--superficie);
+  color: var(--carbon);
+}
+
+.pagina-icono svg { width: 28px; height: 28px; stroke-width: 1.3; }
 
 .titulo h1 {
-  font-size: var(--fs-titulo);
-  line-height: 28px;
+  font-size: 36px;
+  line-height: 1.2;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.5px;
+  color: var(--tinta);
 }
 
-/* La línea bajo el título lleva el hallazgo del día, calculado de los datos. */
-.titulo .hallazgo { margin-top: 4px; color: var(--tenue); }
-.titulo .hallazgo strong { color: var(--texto); font-weight: 500; }
-.titulo-acciones { display: flex; align-items: center; gap: 8px; flex: none; }
-.sello { color: var(--debil); font-size: var(--fs-chica); }
+.titulo .hallazgo { margin-top: 6px; color: var(--pizarra); font-size: 16px; }
+.titulo .hallazgo strong { color: var(--carbon); font-weight: 500; }
+.titulo-acciones { display: flex; align-items: center; gap: 10px; flex: none; }
+.sello { color: var(--acero); font-size: 13px; }
 
-/* ---------- retícula y paneles ---------- */
-/* 1156px de contenido a 1440: 12 × 74.33 + 11 × 24 = 1156 (ver notas). */
+/* Bloque destacado (callout de Notion): el hallazgo del día, el cupo del estudiante. */
+.callout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  margin: -12px 0 28px;
+  border-radius: var(--radio-boton);
+  background: var(--superficie);
+  color: var(--carbon);
+}
+
+.callout svg { flex: none; width: 18px; height: 18px; margin-top: 3px; }
+.callout strong { font-weight: 600; color: var(--tinta); }
+.callout.amarillo { background: var(--amarillo); color: var(--amarillo-tinta); }
+.callout.menta { background: var(--menta); color: var(--menta-tinta); }
+.callout.durazno { background: var(--durazno); color: var(--durazno-tinta); }
+.callout.amarillo strong, .callout.menta strong, .callout.durazno strong { color: inherit; }
+.callout .enlace { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- retícula y tarjetas ---------- */
 .reticula {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: var(--hueco);
+  gap: 20px;
   align-items: start;
 }
 
@@ -231,33 +278,34 @@ a { color: inherit; }
 
 .panel {
   min-width: 0;
-  background: var(--hoja);
-  border: 1px solid var(--borde);
+  background: var(--lienzo);
+  border: 1px solid var(--linea);
   border-radius: var(--radio-tarjeta);
-  padding: var(--relleno-tarjeta);
+  padding: 24px;
 }
 
 .panel > header {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
 }
 
-.panel h2 {
-  font-size: var(--fs-seccion);
-  line-height: 22px;
+.panel h2, .seccion-titulo {
+  font-size: 18px;
+  line-height: 1.4;
   font-weight: 600;
+  color: var(--tinta);
 }
 
-/* Dos tarjetas de una fila comparten el borde inferior: la más corta se estira y fija su acción al pie. */
+.seccion-titulo { margin-bottom: 12px; }
+.panel h2 .num { color: var(--acero); font-weight: 500; margin-left: 8px; }
 .panel.columna { display: flex; flex-direction: column; align-self: stretch; }
-.panel-pie { margin-top: auto; padding-top: 14px; display: flex; justify-content: space-between; gap: 12px; color: var(--tenue); font-size: 13px; }
-.panel h2 .num { color: var(--tenue); font-weight: 400; margin-left: 6px; }
-.seccion-titulo { font-size: var(--fs-seccion); line-height: 22px; font-weight: 600; margin-bottom: 12px; }
-.enlace { color: var(--texto); font-weight: 500; text-underline-offset: 3px; }
-.enlace:hover { text-decoration: underline; }
+.panel-pie { margin-top: auto; padding-top: 14px; display: flex; justify-content: space-between; gap: 12px; color: var(--pizarra); font-size: 13px; }
+.enlace { color: var(--enlace); font-weight: 500; }
+.enlace:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---------- filas de una cola ---------- */
 .filas { display: grid; }
@@ -267,63 +315,56 @@ a { color: inherit; }
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
-  min-height: 56px;
-  padding: 8px 0;
+  min-height: 60px;
+  padding: 10px 0;
 }
 
-.fila + .fila { border-top: 1px solid var(--regla); }
-.fila-principal { min-width: 0; line-height: 20px; }
-.fila-principal strong { font-weight: 500; }
-.fila-principal .sub { display: block; font-size: 13px; color: var(--tenue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fila-valor { text-align: right; line-height: 20px; white-space: nowrap; }
-.fila-valor .sub { display: block; font-size: 13px; color: var(--tenue); }
+.fila + .fila { border-top: 1px solid var(--linea-suave); }
+.fila-principal { min-width: 0; line-height: 1.45; }
+.fila-principal strong { font-weight: 500; color: var(--tinta); }
+.fila-principal .sub { display: block; font-size: 13px; color: var(--pizarra); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fila-valor { text-align: right; line-height: 1.45; white-space: nowrap; }
+.fila-valor .sub { display: block; font-size: 13px; color: var(--pizarra); }
 .fila-acciones { display: flex; gap: 6px; justify-content: flex-end; }
+.atrasado { color: var(--error); font-weight: 500; }
 
-.atrasado { color: var(--negativo); font-weight: 500; }
-
-/* ---------- indicadores como pestañas del estante ---------- */
+/* ---------- indicadores: tarjetas pastel, como las propiedades de Notion ---------- */
 .kpis {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-tarjeta);
+  gap: 12px;
   margin-bottom: 20px;
 }
 
 .kpi {
-  position: relative;
-  padding: 14px var(--relleno-tarjeta);
-  background: none;
-  border: 0;
+  padding: 16px 18px;
+  border: 2px solid transparent;
+  border-radius: var(--radio-tarjeta);
+  background: var(--gris);
+  color: var(--gris-tinta);
   text-align: left;
   cursor: pointer;
+  transition: border-color 150ms ease, transform 100ms ease-out;
 }
 
-.kpi + .kpi { border-left: 1px solid var(--borde); }
-.kpi-etiqueta { display: block; color: var(--tenue); }
-.kpi-valor { display: block; margin-top: 4px; font-size: var(--fs-kpi); line-height: 34px; font-weight: 400; color: var(--texto); }
-.kpi[aria-selected='true'] .kpi-etiqueta { color: var(--texto); font-weight: 600; }
+.kpi:active { transform: scale(0.98); }
+.kpi-etiqueta { display: block; font-size: 14px; font-weight: 500; }
+.kpi-valor { display: block; margin-top: 4px; font-size: 32px; line-height: 1.15; font-weight: 600; letter-spacing: -0.5px; }
 
-/* Selección: una regla de 2px en el tono de datos, como la pestaña activa del estilo. */
-.kpi[aria-selected='true']::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-  background: var(--dato);
-}
+/* Selección: el borde de 2px del plan destacado de Notion, en el violeta primario. */
+.kpi[aria-selected='true'] { border-color: var(--primario); }
 
-/* ---------- el estante: el elemento propio de PrestaLab ---------- */
-/* Cada categoría es un estante vertical; las categorías van lado a lado y usan todo el ancho de la tarjeta. */
-.estante { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px 24px; }
+[data-estado='DISPONIBLE'] { --tono: var(--menta); --tono-tinta: var(--menta-tinta); }
+[data-estado='PRESTADO'] { --tono: var(--cielo); --tono-tinta: var(--cielo-tinta); }
+[data-estado='EN_MANTENIMIENTO'] { --tono: var(--durazno); --tono-tinta: var(--durazno-tinta); }
+.kpi[data-estado] { background: var(--tono); color: var(--tono-tinta); }
 
+/* ---------- el estante ---------- */
+.estante { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px 20px; }
 .estante-grupo { display: grid; gap: 8px; align-content: start; }
-
-.estante-grupo h3 { font-size: var(--fs-cuerpo); font-weight: 500; line-height: 20px; }
-.estante-grupo h3 .num { color: var(--tenue); font-weight: 400; margin-left: 4px; }
+.estante-grupo h3 { font-size: 14px; font-weight: 600; line-height: 20px; color: var(--tinta); }
+.estante-grupo h3 .num { color: var(--acero); font-weight: 500; margin-left: 6px; }
 .estante-celdas { display: grid; gap: 6px; }
 
 .celda {
@@ -331,122 +372,115 @@ a { color: inherit; }
   place-items: center start;
   height: 32px;
   padding: 0 10px;
-  border-radius: 4px;
-  background: var(--elevado);
-  color: var(--tenue);
-  font-family: var(--fuente-mono); /* taste-skill-ignore: las celdas del estante muestran códigos de inventario (IDs) */
+  border-radius: var(--radio-etiqueta);
+  background: var(--superficie);
+  color: var(--acero);
+  font-family: var(--fuente-mono);
   font-size: 13px;
-  transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
-/* La celda del estado elegido toma el único tono de datos. */
-.celda.marcada { background: var(--dato); color: var(--dato-sobre); }
+/* Las celdas del estado elegido toman el color de su propiedad; las demás quedan en gris. */
+.celda.marcada { background: var(--tono); color: var(--tono-tinta); font-weight: 500; }
 
-.estante-leyenda { display: flex; gap: 16px; margin-top: 16px; color: var(--tenue); font-size: 13px; }
+.estante-leyenda { display: flex; gap: 16px; margin-top: 16px; color: var(--pizarra); font-size: 13px; }
 .estante-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
-.muestra { width: 12px; height: 12px; border-radius: 3px; background: var(--elevado); }
-.muestra.marcada { background: var(--dato); }
+.muestra { width: 12px; height: 12px; border-radius: 3px; background: var(--superficie); border: 1px solid var(--linea); }
+.muestra.marcada { background: var(--tono); border-color: transparent; }
 
-/* ---------- tarjetas de conteo que filtran ---------- */
-.conteos {
-  display: grid;
-  /* Tantas columnas como opciones: ninguna tarjeta queda huérfana en otra fila. */
-  grid-template-columns: repeat(var(--opciones, 3), minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: var(--hueco);
-  max-width: calc(var(--opciones, 3) * 190px);
-}
+/* ---------- filtros: pestañas en píldora de Notion ---------- */
+.conteos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
 
 .conteo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  height: 61px;
-  padding: 12px;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-tarjeta);
-  background: var(--hoja);
-  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  background: var(--lienzo);
+  color: var(--pizarra);
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: border-color var(--t-hover) ease, background-color var(--t-hover) ease;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
 }
 
-.conteo:hover { border-color: var(--control); }
-.conteo-etiqueta { font-size: 13px; line-height: 16px; color: var(--tenue); }
-.conteo-valor { font-size: var(--fs-seccion); line-height: 22px; font-weight: 600; }
+.conteo:hover { background: var(--hover); }
+.conteo-valor { font-size: 13px; color: var(--acero); }
+.conteo[aria-selected='true'] { background: var(--tinta); border-color: var(--tinta); color: var(--lienzo); }
+.conteo[aria-selected='true'] .conteo-valor { color: var(--lienzo); }
 
-.conteo[aria-selected='true'] {
-  border: 1.5px solid var(--dato);
-  background: var(--dato-palido);
-  padding: 11.5px;
-}
-
-.conteo[aria-selected='true'] .conteo-etiqueta { color: var(--dato-tinta); }
-
-/* ---------- tablas ---------- */
+/* ---------- tablas, como una base de datos de Notion ---------- */
+/* position: relative contiene el texto oculto (.sr) del encabezado: si no, escapa del desplazamiento y ensancha la página. */
 .tabla-marco {
+  position: relative;
   overflow-x: auto;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-tarjeta);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-boton);
 }
 
 table { width: 100%; border-collapse: collapse; }
 
 th {
-  height: 36px;
-  padding: 0 12px;
+  height: 38px;
+  padding: 0 10px;
   text-align: left;
-  font-weight: 400;
-  font-size: var(--fs-chica);
-  color: var(--tenue);
-  border-bottom: 1px solid var(--borde);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--pizarra);
+  background: var(--superficie-suave);
+  border-bottom: 1px solid var(--linea);
   white-space: nowrap;
 }
 
 td {
-  padding: 14px 12px;
-  border-bottom: 1px solid var(--regla);
+  padding: 14px 10px;
+  border-bottom: 1px solid var(--linea-suave);
   vertical-align: baseline;
+  color: var(--carbon);
 }
 
+tbody tr { transition: background-color 150ms ease; }
+tbody tr:hover { background: var(--hover); }
 tbody tr:last-child td { border-bottom: 0; }
 th.n, td.n { text-align: right; }
-td .sub { display: block; font-size: 13px; color: var(--tenue); }
+td .sub { display: block; font-size: 13px; color: var(--pizarra); margin-top: 2px; }
 td.acciones { text-align: right; white-space: nowrap; padding-top: 10px; padding-bottom: 10px; vertical-align: middle; }
-td.acciones .boton + .boton { margin-left: 4px; }
+td.acciones .boton + .boton { margin-left: 2px; }
+.no-partir { white-space: nowrap; }
 .recortar { display: block; max-width: 36ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Lista de dos líneas que reemplaza a la tabla en el celular. */
-ul.lista-movil { border: 1px solid var(--borde); border-radius: var(--radio-tarjeta); padding: 0 14px; }
-.lista-movil li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 0; }
-.lista-movil li + li { border-top: 1px solid var(--regla); }
-.lista-movil .linea-1 { font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lista-movil .linea-2 { grid-column: 1; font-size: 13px; color: var(--tenue); }
+ul.lista-movil { border: 1px solid var(--linea); border-radius: var(--radio-boton); padding: 0 14px; }
+.lista-movil li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 14px 0; }
+.lista-movil li + li { border-top: 1px solid var(--linea-suave); }
+.lista-movil .linea-1 { font-weight: 500; color: var(--tinta); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lista-movil .linea-2 { grid-column: 1; font-size: 13px; color: var(--pizarra); }
 .lista-movil .valor { text-align: right; white-space: nowrap; }
-.lista-movil .valor .sub { display: block; font-size: 13px; color: var(--tenue); }
-.lista-movil .acciones-movil { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.lista-movil .valor .sub { display: block; font-size: 13px; color: var(--pizarra); }
+.lista-movil .acciones-movil { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 
-/* ---------- píldoras de estado: tinte pálido con tinta del mismo tono ---------- */
+/* ---------- etiquetas de estado: las propiedades de color de Notion ---------- */
 .pildora {
   display: inline-flex;
   flex: none;
   align-items: center;
   height: 22px;
   padding: 0 8px;
-  border-radius: 999px;
-  font-size: var(--fs-chica);
+  border-radius: var(--radio-etiqueta);
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
-  background: var(--pildora-neutra-fondo);
-  color: var(--pildora-neutra-tinta);
+  background: var(--gris);
+  color: var(--gris-tinta);
 }
 
-.pildora.pos { background: var(--pildora-pos-fondo); color: var(--pildora-pos-tinta); }
-.pildora.neg { background: var(--pildora-neg-fondo); color: var(--pildora-neg-tinta); }
-.pildora.atencion { background: var(--pildora-aviso-fondo); color: var(--pildora-aviso-tinta); }
-.pildora.dato { background: var(--dato-palido); color: var(--dato-tinta); }
+.pildora.pos { background: var(--menta); color: var(--menta-tinta); }
+.pildora.dato { background: var(--cielo); color: var(--cielo-tinta); }
+.pildora.atencion { background: var(--durazno); color: var(--durazno-tinta); }
+.pildora.neg { background: var(--rosa); color: var(--rosa-tinta); }
 
-/* Persona: inicial estable sobre un tinte pálido de su propio tono (identidad, no dato). */
 .avatar {
   display: inline-grid;
   place-items: center;
@@ -461,78 +495,78 @@ ul.lista-movil { border: 1px solid var(--borde); border-radius: var(--radio-tarj
 
 .persona-celda { display: flex; align-items: center; gap: 10px; }
 
-/* ---------- controles ---------- */
+/* ---------- botones: rectángulos de 8px, nunca píldoras ---------- */
 .boton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: var(--alto-control);
-  padding: 0 12px;
-  border-radius: var(--radio-control);
-  border: 1px solid var(--control);
-  background: var(--hoja);
-  color: var(--texto);
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radio-boton);
+  border: 1px solid var(--linea-fuerte);
+  background: transparent;
+  color: var(--tinta);
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
-  text-decoration: none;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color var(--t-hover) ease, transform var(--t-presion) ease-out;
+  transition: background-color 150ms ease, transform 100ms ease-out;
 }
 
-.boton:hover:not(:disabled) { background: var(--elevado); }
+.boton:hover:not(:disabled) { background: var(--hover); }
 
 /* Responde al presionar, no al soltar. */
-.boton:active:not(:disabled) { transform: translateY(1px); }
-.boton:disabled { cursor: not-allowed; color: var(--debil); background: var(--elevado); border-color: var(--borde); }
-.boton svg { width: 14px; height: 14px; }
+.boton:active:not(:disabled) { transform: scale(0.98); }
+.boton:disabled { cursor: not-allowed; color: var(--acero); border-color: var(--linea); background: var(--superficie); }
+.boton svg { width: 15px; height: 15px; }
 
-.boton.primario { background: var(--primario); color: var(--primario-tinta); border-color: transparent; }
-.boton.primario:hover:not(:disabled) { background: color-mix(in srgb, var(--primario) 86%, var(--hoja)); }
-.boton.primario:disabled { background: var(--elevado); color: var(--debil); border-color: var(--borde); }
+/* La acción principal de la pantalla: el violeta de Notion, una sola vez. */
+.boton.primario { height: 40px; padding: 0 18px; background: var(--primario); border-color: transparent; color: var(--sobre-primario); }
+.boton.primario:hover:not(:disabled) { background: var(--primario-presionado); }
+.boton.primario:disabled { background: var(--linea); color: var(--acero); }
 
-/* Acción en una fila: botón fantasma con tinta, nunca gris apagado. */
-.boton.fantasma { border-color: transparent; background: transparent; }
-.boton.fantasma:hover:not(:disabled) { background: var(--elevado); }
+.boton.fantasma { border-color: transparent; padding: 0 8px; }
+.boton.fantasma:hover:not(:disabled) { background: var(--hover); }
+.boton.peligro { border-color: transparent; color: var(--error); }
+.boton.peligro:hover:not(:disabled) { background: var(--rosa); }
 
-/* Lo destructivo: texto en el color negativo, sin relleno. */
-.boton.peligro { border-color: transparent; background: transparent; color: var(--negativo); }
-.boton.peligro:hover:not(:disabled) { background: var(--pildora-neg-fondo); }
-
-.formulario { display: grid; gap: 16px; }
-
-.campo { display: grid; gap: 8px; }
-.campo > label, .campo > .etiqueta { font-weight: 500; }
+/* ---------- formularios ---------- */
+.formulario { display: grid; gap: 18px; }
+.campo { display: grid; gap: 6px; }
+.campo > label, .campo > .etiqueta { font-size: 14px; font-weight: 500; color: var(--tinta); }
 
 .entrada, select.entrada, textarea.entrada {
   width: 100%;
-  height: 38px;
+  height: 44px;
   padding: 0 12px;
-  border: 1px solid var(--control);
-  border-radius: var(--radio-control);
-  background: var(--hoja);
-  transition: border-color var(--t-hover) ease, box-shadow var(--t-hover) ease;
+  border: 1px solid var(--linea-fuerte);
+  border-radius: var(--radio-boton);
+  background: var(--lienzo);
+  color: var(--tinta);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
-.entrada:focus { outline: none; border-color: var(--dato); box-shadow: 0 0 0 3px var(--dato-palido); } /* taste-skill-ignore: anillo de foco, no un estado en reposo */
-.entrada[aria-invalid='true'] { border-color: var(--negativo); }
 
-.ayuda { font-size: var(--fs-chica); color: var(--tenue); }
-.ayuda-valido { color: var(--positivo); }
-.ayuda-invalido { color: var(--negativo); }
+/* Foco: el borde de 2px en violeta del documento, hecho con una sombra para no mover el texto. */
+.entrada:focus { outline: none; border-color: var(--primario); box-shadow: 0 0 0 1px var(--primario); }
+.entrada[aria-invalid='true'] { border-color: var(--error); }
+.ayuda { font-size: 13px; color: var(--pizarra); }
+.ayuda-valido { color: var(--menta-tinta); }
+.ayuda-invalido { color: var(--error); }
 
-.interruptor { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.interruptor { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
 
 .interruptor input {
   appearance: none;
   width: 32px;
-  height: 20px;
+  height: 18px;
   margin: 0;
   border-radius: 999px;
-  background: var(--control);
+  background: var(--linea-fuerte);
   position: relative;
   cursor: pointer;
   transition: background-color 200ms ease;
@@ -543,57 +577,50 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #ffffff;
   transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.interruptor input:checked { background: var(--texto); }
-.interruptor input:checked::after { background: var(--hoja); }
-.interruptor input:checked::after { transform: translateX(12px); }
+.interruptor input:checked { background: var(--enlace); }
+.interruptor input:checked::after { transform: translateX(14px); }
 
-.botones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.botones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 .dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.barra-filtros { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: var(--hueco); }
-.barra-filtros .conteos { margin-bottom: 0; flex: 1; }
 
 /* ---------- estados ---------- */
-.alerta { padding: 10px 14px; border-radius: var(--radio-control); margin-bottom: 16px; }
+.alerta { padding: 12px 14px; border-radius: var(--radio-boton); margin-bottom: 16px; font-size: 14px; }
 .alerta ul { margin: 6px 0 0; padding-left: 18px; }
-.alerta-error { background: var(--pildora-neg-fondo); color: var(--pildora-neg-tinta); }
-.alerta-info { background: var(--pildora-aviso-fondo); color: var(--pildora-aviso-tinta); }
+.alerta-error { background: var(--rosa); color: var(--rosa-tinta); }
+.alerta-info { background: var(--amarillo); color: var(--amarillo-tinta); }
 
-/* Vacío: el bloque conserva su marco y una oración. */
 .vacio {
   display: grid;
   place-items: center;
-  min-height: 72px;
-  padding: 16px;
-  border: 1px dashed var(--control);
-  border-radius: var(--radio-control);
-  color: var(--tenue);
+  min-height: 84px;
+  padding: 18px;
+  border-radius: var(--radio-boton);
+  background: var(--superficie);
+  color: var(--pizarra);
   text-align: center;
 }
 
-/* Error: dentro del bloque que falló, con Reintentar. */
 .error-bloque {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  border-radius: var(--radio-control);
-  background: var(--pildora-neg-fondo);
-  color: var(--pildora-neg-tinta);
+  border-radius: var(--radio-boton);
+  background: var(--rosa);
+  color: var(--rosa-tinta);
 }
 
-/* Cargando: la disposición final con barras grises del tamaño real, sin brillo animado. */
-.esqueleto { display: block; height: 12px; border-radius: 4px; background: var(--elevado); }
-.esqueleto.alto { height: 20px; }
+.esqueleto { display: block; height: 12px; border-radius: 4px; background: var(--superficie); }
 
-/* ---------- catálogo ---------- */
+/* ---------- catálogo: tarjetas de 12px ---------- */
 .rejilla {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -604,29 +631,29 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: var(--relleno-tarjeta);
-  border: 1px solid var(--borde);
+  padding: 22px;
+  border: 1px solid var(--linea);
   border-radius: var(--radio-tarjeta);
-  background: var(--hoja);
+  background: var(--lienzo);
+  transition: box-shadow 150ms ease;
 }
 
+.equipo:hover { box-shadow: var(--sombra-flotante); }
 .equipo-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.equipo h2 { font-size: var(--fs-seccion); line-height: 22px; font-weight: 600; margin-top: 4px; }
-.equipo p { line-height: 20px; }
+.equipo h2 { font-size: 18px; line-height: 1.35; font-weight: 600; color: var(--tinta); margin-top: 6px; }
+.equipo p { line-height: 1.5; }
 .equipo .boton { margin-top: auto; align-self: flex-start; }
-.equipo-cuerpo { flex: 1; display: grid; gap: 4px; align-content: start; margin-bottom: 12px; }
+.equipo-cuerpo { flex: 1; display: grid; gap: 4px; align-content: start; margin-bottom: 14px; }
 
-/* El cupo del estudiante (RN01), antes de intentar. */
-.cupo { display: flex; align-items: center; gap: 12px; margin-bottom: var(--hueco); }
-.cupo-pista { display: flex; gap: 4px; }
-.cupo-pista span { width: 28px; height: 8px; border-radius: 999px; background: var(--elevado); border: 1px solid var(--borde); }
-.cupo-pista span.lleno { background: var(--dato); border-color: var(--dato); }
+.cupo-pista { display: inline-flex; gap: 4px; vertical-align: middle; margin-right: 8px; }
+.cupo-pista span { width: 26px; height: 8px; border-radius: 999px; border: 1.5px solid currentColor; }
+.cupo-pista span.lleno { background: currentColor; }
 
-/* ---------- diálogo y hoja inferior (flotan: llevan sombra) ---------- */
+/* ---------- diálogo y hoja inferior ---------- */
 .velo {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 28%);
+  background: rgb(15 15 15 / 45%);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -637,33 +664,32 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
   width: min(30rem, 100%);
   max-height: calc(100vh - 32px);
   overflow: auto;
-  background: var(--hoja);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-hoja);
-  padding: var(--relleno);
-  box-shadow: 0 12px 40px rgb(0 0 0 / 16%); /* taste-skill-ignore: el diálogo flota */
+  background: var(--lienzo);
+  border-radius: var(--radio-tarjeta);
+  padding: 24px;
+  box-shadow: var(--sombra-modal);
 }
 
 .dialogo-cabeza { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
-.dialogo-cabeza h2 { font-size: var(--fs-seccion); font-weight: 600; line-height: 22px; }
+.dialogo-cabeza h2 { font-size: 20px; font-weight: 600; line-height: 1.3; color: var(--tinta); }
 .dialogo p { margin-bottom: 12px; }
 
 .cerrar {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   flex: none;
   border: 0;
-  border-radius: var(--radio-control);
+  border-radius: 6px;
   background: transparent;
-  color: var(--tenue);
-  font-size: 20px;
+  color: var(--acero);
+  font-size: 22px;
   line-height: 1;
   cursor: pointer;
 }
 
-.cerrar:hover { background: var(--elevado); color: var(--texto); }
+.cerrar:hover { background: var(--hover); color: var(--tinta); }
 
 .agarradera {
   position: absolute;
@@ -673,10 +699,10 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
   width: 36px;
   height: 5px;
   border-radius: 999px;
-  background: var(--control);
+  background: var(--linea-fuerte);
 }
 
-/* ---------- avisos (flotan: superficie opaca con sombra, sin vidrio) ---------- */
+/* ---------- avisos ---------- */
 .avisos {
   position: fixed;
   left: 50%;
@@ -699,12 +725,13 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
   align-items: center;
   gap: 12px;
   width: 100%;
-  min-height: 44px;
+  min-height: 46px;
   padding: 8px 8px 8px 16px;
-  border-radius: 10px;
-  background: #1f2123;
+  border-radius: var(--radio-boton);
+  background: #252525;
   color: #ffffff;
-  box-shadow: 0 8px 28px rgb(0 0 0 / 22%); /* taste-skill-ignore: el aviso flota */
+  font-size: 14px;
+  box-shadow: var(--sombra-modal);
   touch-action: pan-y;
   cursor: grab;
 }
@@ -713,43 +740,70 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
 
 .aviso-accion {
   flex: none;
-  height: 28px;
-  padding: 0 10px;
+  height: 30px;
+  padding: 0 12px;
   border: 0;
-  border-radius: var(--radio-control);
-  background: #33363a;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 12%);
   color: #ffffff;
   font-weight: 500;
   cursor: pointer;
 }
 
-.aviso-accion:hover { background: #40444a; }
+.aviso-accion:hover { background: rgb(255 255 255 / 20%); }
 
-/* ---------- acceso ---------- */
+/* ---------- acceso: la banda azul marino de Notion con puntos de colores ---------- */
 .acceso {
   min-height: 100svh;
   display: grid;
-  place-items: center;
-  padding: 24px 16px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
 }
 
-.acceso-tarjeta {
-  width: min(24rem, 100%);
-  background: var(--hoja);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-hoja);
-  padding: 28px 24px;
+.acceso-banda {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 48px 56px;
+  background: var(--marino);
+  color: #ffffff;
 }
 
-.acceso-marca { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
-.acceso-marca strong { display: block; font-size: 15px; font-weight: 600; }
-.acceso-marca small { display: block; color: var(--tenue); font-size: var(--fs-chica); }
-.acceso h1 { font-size: var(--fs-titulo); line-height: 28px; font-weight: 600; margin-bottom: 20px; }
-.acceso .boton.primario { height: 38px; }
-.pie-acceso { margin-top: 20px; color: var(--tenue); text-align: center; }
-.pie-acceso a { color: var(--texto); font-weight: 500; }
+.acceso-banda .acceso-marca strong { color: #ffffff; }
+.acceso-banda .acceso-marca small { color: #b9b6ae; }
 
-/* ---------- tableta y celular: el marco se pliega y la hoja es la pantalla ---------- */
+.banda-titulo {
+  position: relative;
+  z-index: 1;
+  max-width: 17ch;
+  font-size: clamp(40px, 4.4vw, 64px);
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -1.5px;
+}
+
+.banda-sub { position: relative; z-index: 1; margin-top: 18px; max-width: 34ch; color: #c7c4bd; font-size: 18px; line-height: 1.5; }
+
+/* Los puntos de "notas adhesivas" de la banda, en el espectro de color de la marca. */
+.punto { position: absolute; border-radius: 50%; }
+.punto.p1 { width: 18px; height: 18px; background: #f5d75e; top: 18%; right: 14%; }
+.punto.p2 { width: 12px; height: 12px; background: #ff64c8; top: 34%; right: 30%; }
+.punto.p3 { width: 22px; height: 22px; background: #2a9d99; bottom: 22%; right: 12%; }
+.punto.p4 { width: 10px; height: 10px; background: #dd5b00; bottom: 36%; right: 34%; }
+.punto.p5 { width: 14px; height: 14px; background: #7b3ff2; top: 56%; right: 22%; }
+.punto.p6 { width: 8px; height: 8px; background: #1aae39; top: 12%; right: 40%; }
+
+.acceso-panel { display: grid; place-items: center; padding: 48px 24px; background: var(--lienzo); }
+.acceso-tarjeta { width: min(24rem, 100%); }
+.acceso-marca { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
+.acceso-marca strong { display: block; font-size: 15px; font-weight: 600; color: var(--tinta); }
+.acceso-marca small { display: block; color: var(--pizarra); font-size: 13px; }
+.acceso h1 { font-size: 32px; line-height: 1.2; font-weight: 600; letter-spacing: -0.5px; color: var(--tinta); margin-bottom: 24px; }
+.acceso .boton.primario { width: 100%; height: 44px; margin-top: 4px; }
+.pie-acceso { margin-top: 22px; color: var(--pizarra); text-align: center; }
+
+/* ---------- tableta y celular ---------- */
 @media (max-width: 860px) {
   .app { grid-template-columns: minmax(0, 1fr); }
   .lateral { display: none; }
@@ -763,10 +817,11 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
     gap: 8px;
     height: 48px;
     padding: 0 8px;
-    background: var(--marco);
+    background: var(--lienzo);
+    border-bottom: 1px solid var(--linea);
   }
 
-  .barra-movil strong { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barra-movil strong { font-weight: 600; color: var(--tinta); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .boton-menu {
     display: grid;
@@ -774,7 +829,7 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
     width: 44px;
     height: 44px;
     border: 0;
-    border-radius: var(--radio-control);
+    border-radius: 6px;
     background: transparent;
     cursor: pointer;
   }
@@ -784,43 +839,45 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
   .menu-movil {
     position: fixed;
     inset: 0 auto 0 0;
-    width: min(20rem, 86vw);
+    width: min(18rem, 84vw);
     z-index: 25;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 16px 12px;
-    background: var(--marco);
-    box-shadow: 8px 0 32px rgb(0 0 0 / 18%); /* taste-skill-ignore: el menú del celular flota sobre la hoja */
+    gap: 1px;
+    padding: 12px 8px;
+    background: var(--superficie);
+    box-shadow: var(--sombra-modal);
   }
 
   .menu-movil .menu-item { height: 44px; }
 
-  .hoja-trabajo { margin: 0; border: 0; border-radius: 0; padding: 16px; min-height: calc(100svh - 48px); }
+  .hoja-trabajo { padding: 24px 16px 64px; }
   .reticula > * { grid-column: 1 / -1; }
   .estante { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .acceso { grid-template-columns: minmax(0, 1fr); }
+  .acceso-banda { padding: 28px 24px 36px; min-height: 240px; }
+  .banda-titulo { font-size: 36px; letter-spacing: -1px; margin-top: 32px; }
+  .banda-sub { font-size: 16px; }
 }
 
 @media (max-width: 640px) {
   .titulo { flex-wrap: wrap; align-items: flex-start; }
-  .titulo h1 { font-size: 20px; }
+  .titulo h1 { font-size: 28px; }
+  .pagina-icono { width: 44px; height: 44px; }
 
   .kpis { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .kpi + .kpi { border-left: 0; }
-  .kpi:nth-child(2n) { border-left: 1px solid var(--borde); }
-  .kpi:nth-child(n + 3) { border-top: 1px solid var(--borde); }
   .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
-  .kpi[aria-selected='true'] { background: var(--activo); }
-  .kpi[aria-selected='true']::after { content: none; }
+  .kpi-valor { font-size: 26px; }
 
-  /* Las tarjetas de conteo se vuelven una fila que se desliza de lado dentro de su propio marco. */
-  .conteos { display: flex; overflow-x: auto; max-width: none; scrollbar-width: none; }
-  .conteo { flex: none; min-width: 132px; }
+  .conteos { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .conteo { flex: none; }
 
   .fila { grid-template-columns: minmax(0, 1fr) auto; }
+  .fila-acciones { grid-column: 1 / -1; justify-content: flex-start; }
   /* La cola de solicitudes no tiene cifra clave: la fecha de pedido baja a su propia línea. */
   .fila-valor:not(:has(> span:not(.sub))) { grid-column: 1 / -1; text-align: left; }
-  .fila-acciones { grid-column: 1 / -1; justify-content: flex-start; }
+
   .boton { min-height: 40px; }
   .dos-columnas { grid-template-columns: 1fr; }
   .rejilla { grid-template-columns: minmax(0, 1fr); }
@@ -830,7 +887,7 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
   .dialogo.hoja {
     width: 100%;
     max-height: 92vh;
-    border-radius: var(--radio-hoja) var(--radio-hoja) 0 0;
+    border-radius: var(--radio-tarjeta) var(--radio-tarjeta) 0 0;
     padding: 8px 20px calc(20px + env(safe-area-inset-bottom));
   }
 
@@ -838,10 +895,10 @@ textarea.entrada { height: auto; padding: 10px 12px; resize: vertical; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .boton:active:not(:disabled) { transform: none; }
+  .boton:active:not(:disabled), .kpi:active { transform: none; }
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }
 
 @media (prefers-contrast: more) {
-  :root { --borde: #8e8e93; --regla: #c7c7cc; --tenue: #3a3a3c; }
+  :root { --linea: #8e8e93; --linea-suave: #c7c7cc; --pizarra: #3a3a3c; --acero: #3a3a3c; }
 }
