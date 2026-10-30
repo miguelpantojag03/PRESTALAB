@@ -194,9 +194,18 @@ Esta sección resume los detalles de implementación.
 - **Autorización en dos capas:** reglas por URL en `SecurityConfig` y `@PreAuthorize` en cada endpoint.
 - **Datos iniciales:** V2 siembra equipos DISPONIBLE y EN_MANTENIMIENTO, pero ninguno PRESTADO. Un equipo
   PRESTADO sin préstamo asociado nunca podría volver a DISPONIBLE. Los scripts de Flyway no se editan.
-- **Aprobación concurrente:** `aprobarPrestamo` usa `saveAndFlush`. Así el índice único parcial
-  `ux_prestamos_equipo_en_curso` detecta dentro de la transacción una segunda aprobación del mismo equipo, que se
-  responde con 422.
+- **Peticiones simultáneas:** el servicio verifica las reglas antes de guardar, y PostgreSQL detiene a la segunda
+  de dos peticiones que pasaron esa verificación al mismo tiempo. Los cambios se guardan con `saveAndFlush`, así que
+  el error llega antes de enviar el correo.
+  - Dos aprobaciones del mismo equipo: el índice único parcial `ux_prestamos_equipo_en_curso` (V1). La segunda
+    responde 422.
+  - RN01 con solicitudes simultáneas: el trigger `tg_prestamos_rn01` (V3) toma un candado por usuario y vuelve a
+    contar. Las que sobran responden 422.
+  - Dos operaciones sobre el mismo préstamo (por ejemplo, aprobar y rechazar): el trigger `tg_prestamos_transicion`
+    (V3) solo admite las transiciones de D5. La segunda responde 409, así que el equipo nunca queda PRESTADO con
+    un préstamo rechazado.
+- **Contraseñas:** BCrypt admite 72 bytes, no 72 caracteres. Una contraseña con tildes, ñ o emojis que pase de
+  72 bytes se rechaza con 422 en lugar de provocar un 500.
 - **Recordatorios (RF11):** `enviarRecordatorios()` es de solo lectura y llama a `notificarRecordatorio`, nunca a
   `notificarCambioEstado`. Un recordatorio no cambia el estado del préstamo, así que D5 no cambia.
 
@@ -222,7 +231,7 @@ src/main/java/com/prestalab
 └── web/error/         GlobalExceptionHandler
 src/main/resources
 ├── application.yml
-├── db/migration/      V1__esquema.sql, V2__datos_iniciales.sql
+├── db/migration/      V1__esquema.sql, V2__datos_iniciales.sql, V3__reglas_concurrentes.sql
 └── templates/correo/  cambio-estado.html, recordatorio.html
 postman/               colección, entorno y README de las pruebas end-to-end
 docs/adr/              registro de decisiones de arquitectura (ADR 0001 a 0006)
