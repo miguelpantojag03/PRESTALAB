@@ -113,13 +113,15 @@ class RepositoriosIntegracionTest {
 
     @Test
     void prestamoRepositoryMetodosDerivados() {
+        // RN01 (V3): Ana tiene a lo sumo 2 activos, así que el préstamo atrasado es de Beto.
+        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto", "beto@uni.edu.co", "hash", Rol.ESTUDIANTE));
         Prestamo pendiente = prestamoRepository.save(new Prestamo(ana, nuevoEquipo("T-1"), HOY, HOY.plusDays(2)));
 
         Prestamo aprobado = new Prestamo(ana, nuevoEquipo("T-2"), HOY.minusDays(1), HOY.plusDays(3));
         aprobado.aprobar();
         prestamoRepository.save(aprobado);
 
-        Prestamo atrasado = new Prestamo(ana, nuevoEquipo("T-3"), HOY.minusDays(10), HOY.minusDays(4));
+        Prestamo atrasado = new Prestamo(beto, nuevoEquipo("T-3"), HOY.minusDays(10), HOY.minusDays(4));
         atrasado.aprobar();
         prestamoRepository.save(atrasado);
 
@@ -131,7 +133,7 @@ class RepositoriosIntegracionTest {
         entityManager.clear();
 
         assertThat(prestamoRepository.countByUsuarioIdAndEstadoIn(ana.getId(),
-                List.of(EstadoPrestamo.PENDIENTE, EstadoPrestamo.APROBADO))).isEqualTo(3);
+                List.of(EstadoPrestamo.PENDIENTE, EstadoPrestamo.APROBADO))).isEqualTo(2);
         assertThat(prestamoRepository.existsByUsuarioIdAndEstado(ana.getId(), EstadoPrestamo.VENCIDO)).isTrue();
         assertThat(prestamoRepository.existsByUsuarioIdAndEstado(ana.getId(), EstadoPrestamo.RECHAZADO)).isFalse();
 
@@ -140,7 +142,7 @@ class RepositoriosIntegracionTest {
 
         assertThat(prestamoRepository.findByUsuarioIdOrderByFechaSolicitudDesc(ana.getId()))
                 .extracting(Prestamo::getId)
-                .containsExactly(pendiente.getId(), aprobado.getId(), atrasado.getId(), vencido.getId());
+                .containsExactly(pendiente.getId(), aprobado.getId(), vencido.getId());
 
         List<Prestamo> aprobados = prestamoRepository.findByEstadoOrderByFechaSolicitudAsc(EstadoPrestamo.APROBADO);
         assertThat(aprobados).extracting(Prestamo::getId).containsExactly(atrasado.getId(), aprobado.getId());
@@ -170,7 +172,9 @@ class RepositoriosIntegracionTest {
         Prestamo venceDespues = new Prestamo(ana, nuevoEquipo("R-2"), HOY, HOY.plusDays(2));
         venceDespues.aprobar();
         prestamoRepository.save(venceDespues);
-        prestamoRepository.save(new Prestamo(ana, nuevoEquipo("R-3"), HOY, manana));
+        // RN01 (V3): Ana ya tiene 2 activos, así que el pendiente es de Beto.
+        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto", "beto@uni.edu.co", "hash", Rol.ESTUDIANTE));
+        prestamoRepository.save(new Prestamo(beto, nuevoEquipo("R-3"), HOY, manana));
         prestamoRepository.flush();
         entityManager.clear();
 
@@ -226,5 +230,50 @@ class RepositoriosIntegracionTest {
         // Simula la segunda aprobación concurrente, que en la entidad ya habría pasado la guarda.
         assertThatThrownBy(() -> ejecutarSql("UPDATE prestamos SET estado = 'APROBADO' WHERE id = ?", segundo.getId()))
                 .hasStackTraceContaining("ux_prestamos_equipo_en_curso");
+    }
+
+    @Test
+    void v3ImpideUnTercerPrestamoActivoAunqueElServicioNoLoHayaContado() {
+        prestamoRepository.save(new Prestamo(ana, nuevoEquipo("V-1"), HOY, HOY.plusDays(1)));
+        Prestamo aprobado = new Prestamo(ana, nuevoEquipo("V-2"), HOY, HOY.plusDays(1));
+        aprobado.aprobar();
+        prestamoRepository.saveAndFlush(aprobado);
+
+        assertThatThrownBy(() -> prestamoRepository.saveAndFlush(
+                new Prestamo(ana, nuevoEquipo("V-3"), HOY, HOY.plusDays(1))))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasStackTraceContaining("ck_prestamos_rn01");
+    }
+
+    @Test
+    void v3PermiteNuevasSolicitudesCuandoLosPrestamosYaNoEstanActivos() {
+        Prestamo rechazado = new Prestamo(ana, nuevoEquipo("V-4"), HOY, HOY.plusDays(1));
+        rechazado.rechazar("Sin cupo");
+        prestamoRepository.save(rechazado);
+        prestamoRepository.save(new Prestamo(ana, nuevoEquipo("V-5"), HOY, HOY.plusDays(1)));
+
+        Prestamo segundo = prestamoRepository.saveAndFlush(new Prestamo(ana, nuevoEquipo("V-6"), HOY, HOY.plusDays(1)));
+
+        assertThat(segundo.getId()).isNotNull();
+    }
+
+    @Test
+    void v3SoloPermiteLasTransicionesDeD5() {
+        Prestamo prestamo = prestamoRepository.saveAndFlush(new Prestamo(ana, nuevoEquipo("V-7"), HOY, HOY.plusDays(1)));
+        ejecutarSql("UPDATE prestamos SET estado = 'RECHAZADO', motivo_rechazo = 'x' WHERE id = ?", prestamo.getId());
+
+        // Lo que haría un aprobar() simultáneo que leyó el préstamo cuando aún estaba PENDIENTE.
+        assertThatThrownBy(() -> ejecutarSql("UPDATE prestamos SET estado = 'APROBADO' WHERE id = ?", prestamo.getId()))
+                .hasStackTraceContaining("ck_prestamos_transicion");
+    }
+
+    @Test
+    void v3TampocoPermiteRepetirLaMismaTransicion() {
+        Prestamo prestamo = prestamoRepository.saveAndFlush(new Prestamo(ana, nuevoEquipo("V-8"), HOY, HOY.plusDays(1)));
+        ejecutarSql("UPDATE prestamos SET estado = 'RECHAZADO', motivo_rechazo = 'x' WHERE id = ?", prestamo.getId());
+
+        // Lo que haría un segundo rechazar() simultáneo sobre el mismo préstamo.
+        assertThatThrownBy(() -> ejecutarSql("UPDATE prestamos SET estado = 'RECHAZADO' WHERE id = ?", prestamo.getId()))
+                .hasStackTraceContaining("ck_prestamos_transicion");
     }
 }

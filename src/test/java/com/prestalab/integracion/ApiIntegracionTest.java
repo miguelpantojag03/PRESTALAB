@@ -23,10 +23,16 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -192,6 +198,79 @@ class ApiIntegracionTest {
 
         mvc.perform(con(admin, post("/api/v1/usuarios/{id}/activar", id))).andExpect(status().isNoContent());
         login(correo, "Secreta123");
+    }
+
+    /** Lanza las peticiones a la vez (todas esperan la misma señal de salida) y devuelve sus códigos HTTP. */
+    private List<Integer> simultaneas(List<MockHttpServletRequestBuilder> peticiones) throws Exception {
+        ExecutorService hilos = Executors.newFixedThreadPool(peticiones.size());
+        CountDownLatch salida = new CountDownLatch(1);
+        try {
+            List<Future<Integer>> respuestas = new ArrayList<>();
+            for (MockHttpServletRequestBuilder peticion : peticiones) {
+                respuestas.add(hilos.submit(() -> {
+                    salida.await();
+                    return mvc.perform(peticion).andReturn().getResponse().getStatus();
+                }));
+            }
+            salida.countDown();
+            List<Integer> estados = new ArrayList<>();
+            for (Future<Integer> respuesta : respuestas) {
+                estados.add(respuesta.get(30, TimeUnit.SECONDS));
+            }
+            return estados;
+        } finally {
+            hilos.shutdownNow();
+        }
+    }
+
+    @Test
+    void rn01SeCumpleAunqueLleguenSeisSolicitudesSimultaneas() throws Exception {
+        String correo = "carrera-" + UUID.randomUUID() + "@uni.edu.co";
+        registrar(correo);
+        String estudiante = login(correo, "Secreta123");
+        String admin = login("admin@prestalab.local", "Admin123*");
+        List<MockHttpServletRequestBuilder> solicitudes = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            solicitudes.add(con(estudiante, json(post("/api/v1/prestamos"),
+                    "{\"equipoId\":" + equipoNuevo(admin) + ",\"fechaDevolucionEsperada\":\"" + HOY.plusDays(2) + "\"}")));
+        }
+
+        List<Integer> estados = simultaneas(solicitudes);
+
+        assertThat(estados).filteredOn(e -> e == 201).hasSize(2);
+        assertThat(estados).filteredOn(e -> e == 422).hasSize(4);
+        mvc.perform(con(estudiante, get("/api/v1/prestamos/mios"))).andExpect(jsonPath("$.length()").value(2));
+        verify(notificador, times(2)).notificarCambioEstado(any());
+    }
+
+    @Test
+    void aprobarYRechazarAlMismoTiempoNoDejaElEquipoAtascado() throws Exception {
+        String correo = "d5-" + UUID.randomUUID() + "@uni.edu.co";
+        registrar(correo);
+        String estudiante = login(correo, "Secreta123");
+        String admin = login("admin@prestalab.local", "Admin123*");
+        long equipoId = equipoNuevo(admin);
+        String creado = mvc.perform(con(estudiante, json(post("/api/v1/prestamos"),
+                        "{\"equipoId\":" + equipoId + ",\"fechaDevolucionEsperada\":\"" + HOY.plusDays(2) + "\"}")))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        long prestamoId = ((Number) JsonPath.read(creado, "$.id")).longValue();
+
+        List<Integer> estados = simultaneas(List.of(
+                con(admin, post("/api/v1/prestamos/{id}/aprobar", prestamoId)),
+                con(admin, json(post("/api/v1/prestamos/{id}/rechazar", prestamoId), "{\"motivo\":\"Sin cupo\"}"))));
+
+        assertThat(estados).containsExactlyInAnyOrder(200, 409);
+        String prestamo = mvc.perform(con(estudiante, get("/api/v1/prestamos/mios")))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        String estadoFinal = JsonPath.read(prestamo, "$[0].estado");
+        String estadoEquipo = mvc.perform(con(admin, get("/api/v1/equipos/{id}", equipoId)))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(JsonPath.<String>read(estadoEquipo, "$.estado"))
+                .as("el equipo solo queda PRESTADO si el préstamo quedó APROBADO")
+                .isEqualTo(estadoFinal.equals("APROBADO") ? "PRESTADO" : "DISPONIBLE");
+        // Un correo por la creación y otro por la única transición que se guardó.
+        verify(notificador, times(2)).notificarCambioEstado(any());
     }
 
     @Test
