@@ -20,10 +20,7 @@ export function useConsultaMedia(consulta) {
   return coincide;
 }
 
-/**
- * Error o advertencia en línea, junto a lo que lo causó. Con un ErrorApi muestra el detalle y los errores por
- * campo de la API. Se materializa (opacidad y desplazamiento corto) en lugar de aparecer de golpe.
- */
+/** Error de un formulario, junto a lo que lo causó: el detalle de la API y sus errores por campo. */
 export function Alerta({ tipo = 'error', error, children }) {
   if (!error && !children) {
     return null;
@@ -32,7 +29,7 @@ export function Alerta({ tipo = 'error', error, children }) {
   return (
     <motion.div key={error?.message ?? tipo} className={`alerta alerta-${tipo}`}
                 role={tipo === 'error' ? 'alert' : 'status'}
-                initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={RESORTE}>
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={RESORTE}>
       {error ? error.message : children}
       {campos.length > 0 && (
         <ul>
@@ -45,33 +42,143 @@ export function Alerta({ tipo = 'error', error, children }) {
   );
 }
 
+const TONO_EQUIPO = { DISPONIBLE: 'pos', PRESTADO: 'dato', EN_MANTENIMIENTO: 'atencion' };
+const TONO_PRESTAMO = { PENDIENTE: 'atencion', APROBADO: 'dato', VENCIDO: 'neg', DEVUELTO: '', RECHAZADO: '' };
+
+/** Una sola marca de estado por fila: tinte pálido con tinta del mismo tono. */
 export function EstadoEquipo({ estado, activo = true }) {
   if (!activo) {
-    return <span className="insignia insignia-inactivo">Desactivado</span>;
+    return <span className="pildora">Desactivado</span>;
   }
-  return <span className={`insignia insignia-${estado.toLowerCase()}`}>{ESTADOS_EQUIPO[estado]}</span>;
+  return <span className={`pildora ${TONO_EQUIPO[estado]}`}>{ESTADOS_EQUIPO[estado]}</span>;
 }
 
 export function EstadoPrestamo({ estado }) {
-  return <span className={`insignia insignia-${estado.toLowerCase()}`}>{ESTADOS_PRESTAMO[estado]}</span>;
+  return <span className={`pildora ${TONO_PRESTAMO[estado]}`}>{ESTADOS_PRESTAMO[estado]}</span>;
 }
 
-export function Cargando() {
-  return <p className="tenue cargando">Cargando…</p>;
+/** Título de la pantalla: un sustantivo, la línea del hallazgo debajo y las acciones reales a la derecha. */
+export function Titulo({ titulo, hallazgo, children }) {
+  return (
+    <div className="titulo">
+      <div>
+        <h1>{titulo}</h1>
+        {hallazgo && <p className="hallazgo">{hallazgo}</p>}
+      </div>
+      {children && <div className="titulo-acciones">{children}</div>}
+    </div>
+  );
 }
 
 export function Vacio({ children }) {
   return <p className="vacio">{children}</p>;
 }
 
-export function Encabezado({ titulo, descripcion, children }) {
+/** Error dentro del bloque que falló: qué falló y un Reintentar. Nunca un aviso de pantalla completa. */
+export function ErrorBloque({ que, error, alReintentar }) {
   return (
-    <div className="encabezado">
-      <div>
-        <h1>{titulo}</h1>
-        {descripcion && <p className="tenue">{descripcion}</p>}
-      </div>
-      {children && <div className="acciones">{children}</div>}
+    <div className="error-bloque" role="alert">
+      <span>No se pudo cargar {que}. {error?.codigo === 'SIN_CONEXION' ? 'No hay conexión con el servidor.' : ''}</span>
+      <button type="button" className="boton fantasma" onClick={alReintentar}>Reintentar</button>
+    </div>
+  );
+}
+
+/** Cargando: la disposición final con barras grises del tamaño real; nada se mueve cuando llegan los datos. */
+export function EsqueletoFilas({ filas = 4 }) {
+  return (
+    <div className="filas" aria-busy="true" aria-label="Cargando">
+      {Array.from({ length: filas }, (_, i) => (
+        <div key={i} className="fila">
+          <div className="fila-principal">
+            <span className="esqueleto" style={{ width: '46%' }} />
+            <span className="esqueleto" style={{ width: '30%', marginTop: 8 }} />
+          </div>
+          <span className="esqueleto" style={{ width: 64 }} />
+          <span />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Tarjetas de conteo que filtran la lista de abajo (patrón "list" del estilo). Son pares: cada una hace trabajo.
+ * Los conteos se calculan de las filas que hay en pantalla.
+ */
+export function Conteos({ etiqueta, opciones, valor, alCambiar }) {
+  return (
+    <div className="conteos" role="tablist" aria-label={etiqueta} style={{ '--opciones': opciones.length }}>
+      {opciones.map((o) => (
+        <button key={o.valor} type="button" role="tab" className="conteo" aria-selected={valor === o.valor}
+                onClick={() => alCambiar(o.valor)}>
+          <span className="conteo-etiqueta">{o.texto}</span>
+          <span className="conteo-valor">{o.cuenta ?? '–'}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Las filas que dejan la lista por una acción se van deslizando; las demás suben a su lugar. */
+const salidaFila = {
+  layout: 'position',
+  initial: false,
+  exit: { opacity: 0, x: 24 },
+  transition: RESORTE,
+};
+
+/**
+ * Tabla de escritorio que en el celular se vuelve una lista de dos líneas: lo que identifica a la fila y su cifra
+ * clave en la primera, los demás campos en gris en la segunda, la acción debajo. Ningún campo se pierde.
+ */
+export function Tabla({ etiqueta, columnas, filas, clave, movil }) {
+  const esCelular = useConsultaMedia('(max-width: 640px)');
+  if (esCelular) {
+    return (
+      <ul className="lista-movil" aria-label={etiqueta}>
+        <AnimatePresence initial={false}>
+          {filas.map((fila) => {
+            const m = movil(fila);
+            return (
+              <motion.li key={clave(fila)} {...salidaFila}>
+                <span className="linea-1">{m.titulo}</span>
+                <span className="valor">{m.valor}</span>
+                <span className="linea-2">{m.detalle}</span>
+                {m.acciones && <span className="acciones-movil">{m.acciones}</span>}
+              </motion.li>
+            );
+          })}
+        </AnimatePresence>
+      </ul>
+    );
+  }
+  return (
+    <div className="tabla-marco">
+      <table aria-label={etiqueta}>
+        <thead>
+          <tr>
+            {columnas.map((c) => (
+              <th key={c.titulo || 'acciones'} className={c.num ? 'n' : undefined} style={c.ancho ? { width: c.ancho } : undefined}>
+                {c.titulo || <span className="sr">Acciones</span>}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <AnimatePresence initial={false}>
+            {filas.map((fila) => (
+              <motion.tr key={clave(fila)} {...salidaFila}>
+                {columnas.map((c) => (
+                  <td key={c.titulo || 'acciones'} className={c.num ? 'n' : c.acciones ? 'acciones' : undefined}>
+                    {c.celda(fila)}
+                  </td>
+                ))}
+              </motion.tr>
+            ))}
+          </AnimatePresence>
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -92,12 +199,10 @@ export function useDialogo() {
 /**
  * Diálogo para una tarea modal. Quien lo use lo envuelve en <AnimatePresence> para que la salida también se anime.
  *
- * - En escritorio nace del botón que lo abrió (transform-origin en ese botón) y se cierra volviendo a él: entra y
- *   sale por el mismo camino.
- * - En el celular es una hoja inferior. Se arrastra desde la barra superior siguiendo al dedo 1:1 y opone
- *   resistencia elástica hacia arriba. Al soltarla se proyecta el impulso: un movimiento rápido hacia abajo la
- *   cierra aunque haya recorrido poco.
- * - Un velo oscurece el fondo porque la tarea es modal. Mientras sale ya no bloquea clics.
+ * - En escritorio nace del botón que lo abrió (transform-origin en ese botón) y se cierra volviendo a él.
+ * - En el celular es una hoja inferior: se arrastra 1:1 desde su cabeza, resiste hacia arriba y, al soltarla, se
+ *   proyecta el impulso: un gesto rápido hacia abajo la cierra aunque haya recorrido poco.
+ * - Mientras sale queda inert: no recibe clics, foco ni texto, y no compite con un diálogo nuevo.
  */
 export function Dialogo({ titulo, alCerrar, children }) {
   const esCelular = useConsultaMedia('(max-width: 640px)');
@@ -133,18 +238,16 @@ export function Dialogo({ titulo, alCerrar, children }) {
 
   const movimiento = esCelular
     ? { initial: { y: '100%' }, animate: { y: 0 }, exit: { y: '100%' } }
-    : { initial: { opacity: 0, scale: 0.9 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: 0.9 } };
+    : { initial: { opacity: 0, scale: 0.94 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: 0.94 } };
 
   function alSoltar(_evento, info) {
     const alto = panel.current?.offsetHeight ?? 400;
-    const destino = info.offset.y + proyectar(info.velocity.y);
-    if (destino > alto * 0.5) {
+    if (info.offset.y + proyectar(info.velocity.y) > alto * 0.5) {
       alCerrar();
     }
   }
 
   return (
-    // Mientras sale queda inert: no recibe clics, foco ni texto, y no compite con un diálogo nuevo.
     <motion.div className="velo" role="presentation" inert={presente ? undefined : ''}
                 style={{ pointerEvents: presente ? 'auto' : 'none' }}
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={RESORTE}
@@ -169,14 +272,13 @@ const ContextoAvisos = createContext(null);
 const DURACION_AVISO_MS = 5000;
 
 /**
- * Avisos de finalización. Aparecen abajo en un material translúcido, se van solos y se pueden descartar
- * deslizándolos hacia un lado (con proyección de impulso). Pueden ofrecer una acción, por ejemplo Deshacer.
+ * Avisos de finalización: flotan (superficie opaca con sombra), se van solos y se descartan deslizándolos hacia un
+ * lado. Pueden ofrecer una acción, por ejemplo Deshacer. En el celular aparecen arriba, porque abajo van las hojas.
  */
 export function ProveedorAvisos({ children }) {
   const [avisos, setAvisos] = useState([]);
   const [salida, setSalida] = useState(0);
   const siguienteId = useRef(0);
-  // En el celular la parte de abajo es de las hojas, así que los avisos aparecen arriba.
   const arriba = useConsultaMedia('(max-width: 640px)');
 
   const quitar = useCallback((id, direccion = 0) => {
@@ -207,13 +309,12 @@ export function ProveedorAvisos({ children }) {
   );
 }
 
-// Entra desde el borde más cercano (abajo, o arriba en el celular) y, si se va solo, sale por ese mismo borde.
-// Si el dedo lo empujó, sale hacia donde lo empujó.
+// Entra desde el borde más cercano y, si se va solo, sale por ese mismo borde; si el dedo lo empujó, sale hacia allá.
 const variantesAviso = {
-  oculto: ({ arriba }) => ({ opacity: 0, y: arriba ? -24 : 24, x: 0 }),
+  oculto: ({ arriba }) => ({ opacity: 0, y: arriba ? -16 : 16, x: 0 }),
   visible: { opacity: 1, y: 0, x: 0 },
   saliendo: ({ direccion, arriba }) =>
-    (direccion ? { opacity: 0, x: direccion * 360 } : { opacity: 0, y: arriba ? -24 : 24 }),
+    (direccion ? { opacity: 0, x: direccion * 360 } : { opacity: 0, y: arriba ? -16 : 16 }),
 };
 
 function Aviso({ aviso, alQuitar, arriba }) {
@@ -236,11 +337,10 @@ function Aviso({ aviso, alQuitar, arriba }) {
 
   return (
     <motion.div layout className="aviso" variants={variantesAviso} custom={{ direccion: 0, arriba }}
-                initial="oculto" animate="visible"
-                exit="saliendo" transition={RESORTE_HOJA} drag="x" dragSnapToOrigin dragElastic={0.6}
-                onDragEnd={alSoltar} onPointerEnter={() => setPausado(true)}
-                onPointerLeave={() => setPausado(false)} onFocus={() => setPausado(true)}
-                onBlur={() => setPausado(false)}>
+                initial="oculto" animate="visible" exit="saliendo" transition={RESORTE_HOJA}
+                drag="x" dragSnapToOrigin dragElastic={0.6} onDragEnd={alSoltar}
+                onPointerEnter={() => setPausado(true)} onPointerLeave={() => setPausado(false)}
+                onFocus={() => setPausado(true)} onBlur={() => setPausado(false)}>
       <span>{aviso.texto}</span>
       {aviso.accion && (
         <button type="button" className="aviso-accion" onClick={() => {

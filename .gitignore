@@ -19,3 +19,6 @@ Thumbs.db
 # Frontend
 frontend/node_modules/
 frontend/dist/
+
+# Archivos de trabajo de tasteskill (capturas del inspector y notas)
+.taste-skill/
