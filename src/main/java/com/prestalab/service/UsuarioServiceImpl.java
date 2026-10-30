@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +36,8 @@ public class UsuarioServiceImpl implements UsuarioService {
     private static final String CORREO_DUPLICADO = "Ya existe una cuenta con ese correo";
     private static final String CREDENCIALES_INVALIDAS = "Correo o contraseña incorrectos";
     private static final String EMISOR = "prestalab";
+    /** BCrypt solo admite 72 bytes; @Size cuenta caracteres, y la ñ, las tildes y los emojis ocupan más de uno. */
+    private static final int MAXIMO_BYTES_PASSWORD = 72;
     /**
      * Hash BCrypt (costo 12) contra el que se compara la contraseña cuando el correo no existe,
      * para que el tiempo de respuesta no revele qué correos están registrados.
@@ -60,6 +63,10 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Override
     @Transactional
     public UsuarioDTO registrar(RegistroUsuarioDTO dto) {
+        if (dto.password().getBytes(StandardCharsets.UTF_8).length > MAXIMO_BYTES_PASSWORD) {
+            throw new ReglaNegocioException("La contraseña es demasiado larga: con tildes, ñ o emojis "
+                    + "admite menos de 72 caracteres");
+        }
         String correo = normalizarCorreo(dto.correo());
         if (usuarioRepository.findByCorreo(correo).isPresent()) {
             throw new ReglaNegocioException(CORREO_DUPLICADO);

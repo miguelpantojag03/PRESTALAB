@@ -105,6 +105,28 @@ class UsuarioServiceImplTest {
                 .hasMessage("Ya existe una cuenta con ese correo");
     }
 
+    @Test
+    void contrasenaDeMenosDe72CaracteresPeroMasDe72BytesSeRechazaSinLlegarABcrypt() {
+        String sesentaEnes = "ñ".repeat(60);
+
+        assertThatThrownBy(() -> servicio.registrar(new RegistroUsuarioDTO("Ana", "ana@uni.edu.co", sesentaEnes)))
+                .isInstanceOf(ReglaNegocioException.class)
+                .hasMessageContaining("demasiado larga");
+        verify(passwordEncoder, never()).encode(any());
+        verify(usuarioRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void contrasenaDeExactamente72BytesSeAcepta() {
+        String setentaYDosBytes = "ñ".repeat(36);
+        when(usuarioRepository.findByCorreo("ana@uni.edu.co")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(setentaYDosBytes)).thenReturn("hash");
+        when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(servicio.registrar(new RegistroUsuarioDTO("Ana", "ana@uni.edu.co", setentaYDosBytes)).correo())
+                .isEqualTo("ana@uni.edu.co");
+    }
+
     @Nested
     class IniciarSesion {
 
