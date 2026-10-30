@@ -1,0 +1,4 @@
+# Finales de línea LF en el repositorio, para que CI y Docker (Linux) lean igual los archivos.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
