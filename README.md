@@ -2,8 +2,11 @@
 
 [![CI](https://github.com/miguelpantojag03/PRESTALAB/actions/workflows/ci.yml/badge.svg)](https://github.com/miguelpantojag03/PRESTALAB/actions/workflows/ci.yml)
 
-API REST de préstamo de equipos del laboratorio universitario. JSON sobre HTTP, autenticación stateless con JWT
-y documentación con Swagger UI. No tiene interfaz web propia: se usa desde Swagger UI, Postman o cualquier cliente HTTP.
+Sistema de préstamo de equipos del laboratorio universitario. Tiene dos partes:
+
+- **Backend:** API REST con JSON sobre HTTP, autenticación stateless con JWT y documentación en Swagger UI.
+- **Frontend:** aplicación web en React (carpeta [frontend/](frontend/README.md)) que consume esa API. Ver el
+  [ADR 0007](docs/adr/0007-frontend-react-en-contenedor-propio.md).
 
 - **Estudiante:** consulta el catálogo, solicita préstamos y revisa su historial.
 - **Administrador:** aprueba o rechaza solicitudes, registra devoluciones y gestiona equipos y estudiantes.
@@ -13,12 +16,14 @@ y documentación con Swagger UI. No tiene interfaz web propia: se usa desde Swag
   - a las 08:00 recuerda los préstamos que vencen al día siguiente.
 
 Java 21 · Spring Boot 3.5 · Spring Security 6 (OAuth2 Resource Server, JWT HS256) · Spring Data JPA ·
-springdoc-openapi · PostgreSQL 16 · Flyway · Docker Compose · Thymeleaf (solo para las plantillas de correo).
+springdoc-openapi · PostgreSQL 16 · Flyway · Docker Compose · Thymeleaf (solo para las plantillas de correo) ·
+React 18 · Vite · nginx.
 
 ## Requisitos
 
 - JDK 21 y Maven 3.9
 - Docker con Docker Compose (para levantar el sistema y para las pruebas con Testcontainers)
+- Node.js 20 o superior, solo para desarrollar el frontend fuera de Docker
 
 ## Levantar todo (D7 y D8)
 
@@ -37,6 +42,7 @@ Si `PRESTALAB_JWT_SECRET` falta o tiene menos de 32 bytes, la aplicación no arr
 
 | Servicio | URL |
 |---|---|
+| **Aplicación web (frontend)** | **http://localhost:3000** |
 | API | http://localhost:8080/api/v1 |
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | Especificación OpenAPI | http://localhost:8080/v3/api-docs |
@@ -123,11 +129,15 @@ desactivada". Sus préstamos no cambian. Las cuentas de administrador no se pued
 
 | Contenedor | Imagen | Puertos |
 |---|---|---|
+| `prestalab-web` | build de `frontend/Dockerfile` (Node 20 compila; `nginx-unprivileged` sirve y reenvía `/api`) | 3000:8080 |
 | `prestalab-app` | build del `Dockerfile` (`eclipse-temurin:21-jre`, usuario no root) | 8080:8080 |
 | `prestalab-db` | `postgres:16`, volumen `pgdata:/var/lib/postgresql/data` | 5432:5432 |
 | `prestalab-mail` | `axllent/mailpit` | 1025:1025 (SMTP), 8025:8025 (web) |
 
-Todos están en la red `prestalab-net` (bridge). Variables de entorno de `prestalab-app`:
+Son cuatro contenedores: el frontend amplía los tres originales de D8 (ver el ADR 0007). Todos están en la red
+`prestalab-net` (bridge). El navegador solo habla con `prestalab-web`, que reenvía `/api`, `/swagger-ui` y
+`/v3/api-docs` a `prestalab-app`. Así hay un solo origen y el backend no necesita CORS. Variables de entorno de
+`prestalab-app`:
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `SPRING_MAIL_HOST`,
 `SPRING_MAIL_PORT` y `PRESTALAB_JWT_SECRET`.
 
@@ -166,12 +176,13 @@ Para importarla en Postman, ver qué cubre cada carpeta y qué queda en JUnit (R
 
 ### Integración continua
 
-`.github/workflows/ci.yml` tiene dos jobs y no usa secretos del repositorio:
+`.github/workflows/ci.yml` tiene tres jobs y no usa secretos del repositorio:
 
 | Job | Qué hace |
 |---|---|
 | `verify` | `mvn -B verify` (Ubuntu, Temurin 21, caché de Maven). Corre todas las pruebas, incluidas las de Testcontainers, y publica el reporte de JaCoCo como artefacto `reporte-jacoco`. |
-| `e2e-postman` | Corre después de `verify`. Empaqueta el jar, genera un secreto JWT en el propio job, levanta `docker compose`, ejecuta Newman y publica el reporte JUnit como `reporte-newman`. Siempre apaga los contenedores. |
+| `frontend` | En paralelo con `verify`: `npm ci`, las pruebas de Vitest y `npm run build`. |
+| `e2e-postman` | Corre después de los otros dos. Empaqueta el jar, genera un secreto JWT en el propio job, levanta los cuatro contenedores y comprueba que el frontend responde en el puerto 3000 y reenvía la API. Después ejecuta Newman y publica el reporte JUnit como `reporte-newman`. Siempre apaga los contenedores. |
 
 ## Decisiones de implementación
 
@@ -234,5 +245,6 @@ src/main/resources
 ├── db/migration/      V1__esquema.sql, V2__datos_iniciales.sql, V3__reglas_concurrentes.sql
 └── templates/correo/  cambio-estado.html, recordatorio.html
 postman/               colección, entorno y README de las pruebas end-to-end
-docs/adr/              registro de decisiones de arquitectura (ADR 0001 a 0006)
+docs/adr/              registro de decisiones de arquitectura (ADR 0001 a 0007)
+frontend/              aplicación web React + Vite, su Dockerfile y la configuración de nginx
 ```

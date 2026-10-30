@@ -1,6 +1,18 @@
-# Despliegue de PrestaLab (D8): tres contenedores en la red prestalab-net y el volumen pgdata.
+# Despliegue de PrestaLab (D8): cuatro contenedores en la red prestalab-net y el volumen pgdata.
+# prestalab-web sirve el frontend en http://localhost:3000 y reenvía /api a prestalab-app.
 # Las credenciales de la base de datos y el secreto JWT se leen de .env (ver .env.example); nunca se versionan.
 services:
+  prestalab-web:
+    build: ./frontend
+    container_name: prestalab-web
+    ports:
+      - "3000:8080"
+    depends_on:
+      - prestalab-app
+    restart: unless-stopped
+    networks:
+      - prestalab-net
+
   prestalab-app:
     build: .
     container_name: prestalab-app
