@@ -17,7 +17,7 @@ Se prueba en cuatro niveles, de más rápido a más realista:
 | 1. Dominio y servicios | JUnit 5 y Mockito | Reglas RN, transiciones de D5 y el orden de D6 (`InOrder`) | `PrestamoTest`, `PrestamoServiceImplTest` |
 | 2. Arquitectura | ArchUnit y reflexión | Las 15 dependencias de D7 y el diccionario de clases, métodos y endpoints | `ArquitecturaTest`, `FidelidadDiccionarioTest` |
 | 3. Capa web | `@WebMvcTest` con la `SecurityConfig` real | Matriz de seguridad (sin token, token alterado, vencido o de otro emisor, rol equivocado), códigos de error y cabecera `Location` | `ControladoresRestTest` |
-| 4. Integración | Testcontainers (PostgreSQL 16) | Flyway, consultas JPA, índices únicos y el flujo D6 completo por HTTP | `RepositoriosIntegracionTest`, `ApiIntegracionTest` |
+| 4. Integración | Testcontainers (PostgreSQL 16) | Flyway, consultas JPA, índices únicos, triggers de V3, el flujo D6 completo por HTTP y peticiones simultáneas con hilos (RN01 y aprobar contra rechazar) | `RepositoriosIntegracionTest`, `ApiIntegracionTest` |
 
 Además, fuera de JUnit:
 

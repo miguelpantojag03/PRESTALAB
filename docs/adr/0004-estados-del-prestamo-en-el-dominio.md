@@ -20,7 +20,15 @@ y la regla quedaría repartida en varios lugares.
   `estaVencido(hoy)`, porque depende de la fecha actual.
 - Los servicios orquestan en el orden de D6: validan las reglas, cargan las entidades, llaman a la transición,
   guardan y notifican. La prueba `InOrder` de `PrestamoServiceImplTest` fija ese orden.
-- Ante dos aprobaciones concurrentes del mismo equipo, la base de datos tiene la última palabra: el índice
+- Ante peticiones simultáneas, la base de datos tiene la última palabra. La verificación de la entidad no basta:
+  dos transacciones pueden leer el mismo préstamo PENDIENTE, una aprobarlo y la otra rechazarlo, y la última
+  escritura gana. Se probó así: en 15 de 15 intentos el préstamo quedaba RECHAZADO con el equipo PRESTADO para
+  siempre. Por eso la migración V3 agrega el trigger `tg_prestamos_transicion`, que repite en PostgreSQL las
+  transiciones de D5. La segunda operación ve el estado que dejó la primera, falla, y el servicio la responde con
+  409 antes de notificar.
+- La misma migración protege RN01 con `tg_prestamos_rn01`, que toma un candado por usuario y vuelve a contar los
+  préstamos activos.
+- Ante dos aprobaciones concurrentes del mismo equipo, el índice
   único parcial `ux_prestamos_equipo_en_curso` y `saveAndFlush` hacen fallar la segunda aprobación dentro de
   la transacción, con 422.
 
@@ -31,7 +39,8 @@ y la regla quedaría repartida en varios lugares.
 | Validar las transiciones en el servicio | La regla quedaría lejos del dato y otro servicio podría saltársela (modelo anémico). |
 | Patrón State (una clase por estado) | Cinco clases para cuatro métodos de transición. El diccionario no las incluye y un `switch` sobre el enum es más claro. |
 | Spring Statemachine | Una dependencia pesada para una máquina de estados que cabe en una entidad. |
-| Bloqueo optimista (`@Version`) | Detecta que alguien editó el mismo préstamo, no dos préstamos distintos sobre el mismo equipo. El índice sí lo detecta. |
+| Bloqueo optimista (`@Version`) | Detecta que alguien editó el mismo préstamo, pero agrega un atributo que no está en el diccionario de D4. Tampoco detecta dos préstamos distintos sobre el mismo equipo; el índice sí. |
+| `@Lock(PESSIMISTIC_WRITE)` en los repositorios | Agrega métodos que el diccionario no tiene, y bloquear al usuario al inicio cambiaría el orden de llamadas de D6. Los triggers de V3 protegen lo mismo sin tocar el código de D4 a D7. |
 
 ## Consecuencias
 
