@@ -1,0 +1,16 @@
+# Perfil de pruebas. La conexión a PostgreSQL la inyecta Testcontainers con @DynamicPropertySource.
+spring:
+  mail:
+    host: localhost
+    port: 1025
+  thymeleaf:
+    cache: false
+
+prestalab:
+  jwt:
+    # Solo para pruebas: no es un secreto real.
+    secret: secreto-de-pruebas-de-prestalab-de-al-menos-32-bytes
+
+logging:
+  level:
+    com.prestalab: DEBUG
