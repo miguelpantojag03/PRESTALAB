@@ -1,0 +1,26 @@
+{
+  "name": "prestalab-web",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Frontend de PrestaLab: consume la API REST /api/v1 con el token JWT.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.30.6"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@vitejs/plugin-react": "4.7.0",
+    "jsdom": "25.0.1",
+    "vite": "5.4.21",
+    "vitest": "2.1.9"
+  }
+}

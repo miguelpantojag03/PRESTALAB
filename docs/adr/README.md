@@ -11,3 +11,4 @@ descartadas y lo que se gana y se pierde con ella. Se escriben en el formato de 
 | [0004](0004-estados-del-prestamo-en-el-dominio.md) | Las transiciones del préstamo viven en la entidad | Aceptada |
 | [0005](0005-login-uniforme-y-cuentas-desactivadas.md) | Login uniforme y cuentas desactivadas con token vigente | Aceptada |
 | [0006](0006-estrategia-de-pruebas.md) | Estrategia de pruebas en cuatro niveles | Aceptada |
+| [0007](0007-frontend-react-en-contenedor-propio.md) | Frontend React en un contenedor propio | Aceptada (amplía D1 y D8) |
