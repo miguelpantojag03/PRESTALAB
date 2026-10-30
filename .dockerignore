@@ -1,0 +1,3 @@
+# Solo el jar entra en la imagen.
+*
+!target/prestalab.jar
