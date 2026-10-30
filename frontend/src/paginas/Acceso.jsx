@@ -4,6 +4,7 @@ import { useAnimate } from 'motion/react';
 import { api } from '../api/cliente.js';
 import { useSesion } from '../auth/Sesion.jsx';
 import { Alerta } from '../componentes/Comunes.jsx';
+import { Marca } from '../componentes/Iconos.jsx';
 import { inicioSegunRol } from '../componentes/Plantilla.jsx';
 
 const MAXIMO_BYTES_PASSWORD = 72;
@@ -28,10 +29,10 @@ function MarcoAcceso({ titulo, alcance, children }) {
     <div className="acceso">
       <div className="acceso-tarjeta" ref={alcance}>
         <div className="acceso-marca">
-          <span className="logo" aria-hidden="true">PL</span>
+          <Marca tamano={32} />
           <div>
             <strong>PrestaLab</strong>
-            <span>Préstamo de equipos del laboratorio</span>
+            <small>Préstamo de equipos del laboratorio</small>
           </div>
         </div>
         <h1>{titulo}</h1>
@@ -76,17 +77,17 @@ export function IniciarSesion() {
       {motivoCierre && !error && <Alerta tipo="info">{motivoCierre}</Alerta>}
       <Alerta error={error} />
       <form onSubmit={enviar} className="formulario">
-        <label>
-          Correo
-          <input type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} autoComplete="username"
-                 required autoFocus />
-        </label>
-        <label>
-          Contraseña
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                 autoComplete="current-password" required />
-        </label>
-        <button type="submit" className="boton" disabled={enviando}>
+        <div className="campo">
+          <label htmlFor="login-correo">Correo</label>
+          <input id="login-correo" className="entrada" type="email" value={correo}
+                 onChange={(e) => setCorreo(e.target.value)} autoComplete="username" required autoFocus />
+        </div>
+        <div className="campo">
+          <label htmlFor="login-password">Contraseña</label>
+          <input id="login-password" className="entrada" type="password" value={password}
+                 onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+        </div>
+        <button type="submit" className="boton primario" disabled={enviando}>
           {enviando ? 'Entrando…' : 'Entrar'}
         </button>
       </form>
@@ -140,27 +141,28 @@ export function Registro() {
     <MarcoAcceso titulo="Crear cuenta de estudiante">
       <Alerta error={error} />
       <form onSubmit={enviar} className="formulario">
-        <label>
-          Nombre completo
-          <input value={datos.nombre} onChange={cambiar('nombre')} maxLength={100} autoComplete="name" required
-                 autoFocus />
-        </label>
-        <label>
-          Correo institucional
-          <input type="email" value={datos.correo} onChange={cambiar('correo')} maxLength={150}
-                 autoComplete="email" required />
-        </label>
+        <div className="campo">
+          <label htmlFor="registro-nombre">Nombre completo</label>
+          <input id="registro-nombre" className="entrada" value={datos.nombre} onChange={cambiar('nombre')}
+                 maxLength={100} autoComplete="name" required autoFocus />
+        </div>
+        <div className="campo">
+          <label htmlFor="registro-correo">Correo institucional</label>
+          <input id="registro-correo" className="entrada" type="email" value={datos.correo}
+                 onChange={cambiar('correo')} maxLength={150} autoComplete="email" required />
+        </div>
         {/* La ayuda va fuera del label: así el nombre accesible del campo es solo "Contraseña". */}
         <div className="campo">
           <label htmlFor="registro-password">Contraseña</label>
-          <input id="registro-password" type="password" value={datos.password} onChange={cambiar('password')}
+          <input id="registro-password" className="entrada" type="password" value={datos.password}
+                 onChange={cambiar('password')}
                  minLength={8} maxLength={72} autoComplete="new-password" required aria-describedby="ayuda-password"
                  aria-invalid={avisoPassword.tipo === 'invalido'} />
           <small id="ayuda-password" className={`ayuda ayuda-${avisoPassword.tipo}`} aria-live="polite">
             {avisoPassword.texto}
           </small>
         </div>
-        <button type="submit" className="boton" disabled={enviando || avisoPassword.tipo === 'invalido'}>
+        <button type="submit" className="boton primario" disabled={enviando || avisoPassword.tipo === 'invalido'}>
           {enviando ? 'Creando cuenta…' : 'Crear cuenta'}
         </button>
       </form>

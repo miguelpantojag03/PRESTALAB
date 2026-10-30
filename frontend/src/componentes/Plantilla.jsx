@@ -1,19 +1,24 @@
-import { useEffect, useState } from 'react';
-import { NavLink, Navigate, Outlet } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
+import { api } from '../api/cliente.js';
 import { useSesion } from '../auth/Sesion.jsx';
-import { RESORTE_RAPIDO } from '../util/movimiento.js';
+import { RESORTE } from '../util/movimiento.js';
+import {
+  Avatar, IconoCatalogo, IconoEquipos, IconoEstudiantes, IconoHistorial, IconoMenu, IconoPanel, IconoPrestamos,
+  IconoSalir, Marca,
+} from './Iconos.jsx';
 
 const MENU = {
   ESTUDIANTE: [
-    { a: '/catalogo', texto: 'Catálogo' },
-    { a: '/mis-prestamos', texto: 'Mis préstamos' },
+    { a: '/catalogo', texto: 'Catálogo', Icono: IconoCatalogo },
+    { a: '/mis-prestamos', texto: 'Mis préstamos', Icono: IconoHistorial },
   ],
   ADMIN: [
-    { a: '/admin', texto: 'Panel', fin: true },
-    { a: '/admin/prestamos', texto: 'Préstamos' },
-    { a: '/admin/equipos', texto: 'Equipos' },
-    { a: '/admin/estudiantes', texto: 'Estudiantes' },
+    { a: '/admin', texto: 'Panel', Icono: IconoPanel, fin: true },
+    { a: '/admin/prestamos', texto: 'Préstamos', Icono: IconoPrestamos, cola: true },
+    { a: '/admin/equipos', texto: 'Equipos', Icono: IconoEquipos },
+    { a: '/admin/estudiantes', texto: 'Estudiantes', Icono: IconoEstudiantes },
   ],
 };
 
@@ -36,56 +41,123 @@ export function RutaProtegida({ rol }) {
   return <Outlet />;
 }
 
-/** El borde de la barra solo aparece cuando hay contenido pasando por debajo de ella. */
-function useDesplazado() {
-  const [desplazado, setDesplazado] = useState(false);
-  useEffect(() => {
-    const revisar = () => setDesplazado(window.scrollY > 4);
-    revisar();
-    window.addEventListener('scroll', revisar, { passive: true });
-    return () => window.removeEventListener('scroll', revisar);
-  }, []);
-  return desplazado;
+/** Solicitudes por aprobar: el único conteo del menú, porque es la única cola que pide una acción. */
+const ContextoCola = createContext({ pendientes: null, recargarCola: () => {} });
+export const useCola = () => useContext(ContextoCola);
+
+function Menu({ items, pendientes, alElegir }) {
+  return (
+    <nav aria-label="Principal">
+      {items.map(({ a, texto, Icono, fin, cola }) => (
+        <NavLink key={a} to={a} end={fin} className="menu-item" onClick={alElegir}>
+          <Icono />
+          {texto}
+          {cola && pendientes > 0 && (
+            <span className="menu-cuenta" aria-label={`${pendientes} solicitudes por aprobar`}>{pendientes}</span>
+          )}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+function Marcador({ sesion }) {
+  return (
+    <NavLink to={inicioSegunRol(sesion.rol)} className="marca">
+      <Marca />
+      <span>
+        <strong>PrestaLab</strong>
+        <small>{sesion.rol === 'ADMIN' ? 'Administración del laboratorio' : 'Préstamo de equipos'}</small>
+      </span>
+    </NavLink>
+  );
+}
+
+function Persona({ sesion, alSalir }) {
+  return (
+    <div className="lateral-pie">
+      <Avatar nombre={sesion.nombre} id={sesion.usuarioId} />
+      <span className="persona">
+        <strong>{sesion.nombre}</strong>
+        <small>{sesion.rol === 'ADMIN' ? 'Administrador' : 'Estudiante'}</small>
+      </span>
+      <button type="button" className="boton fantasma" onClick={alSalir} aria-label="Cerrar sesión" title="Cerrar sesión">
+        <IconoSalir />
+      </button>
+    </div>
+  );
 }
 
 export function Plantilla() {
   const { sesion, cerrarSesion } = useSesion();
-  const desplazado = useDesplazado();
+  const ubicacion = useLocation();
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const [pendientes, setPendientes] = useState(null);
+  const esAdmin = sesion.rol === 'ADMIN';
+  const items = MENU[sesion.rol];
+  const actual = items.find((i) => (i.fin ? ubicacion.pathname === i.a : ubicacion.pathname.startsWith(i.a)));
+
+  const recargarCola = useCallback(async () => {
+    if (!esAdmin) {
+      return;
+    }
+    try {
+      setPendientes((await api.prestamosPendientes()).length);
+    } catch {
+      // El conteo es una ayuda; si falla, la pantalla de préstamos muestra su propio error.
+    }
+  }, [esAdmin]);
+
+  useEffect(() => {
+    recargarCola();
+  }, [recargarCola, ubicacion.pathname]);
+
+  useEffect(() => {
+    if (!menuAbierto) {
+      return undefined;
+    }
+    const alTeclear = (e) => e.key === 'Escape' && setMenuAbierto(false);
+    document.addEventListener('keydown', alTeclear);
+    return () => document.removeEventListener('keydown', alTeclear);
+  }, [menuAbierto]);
+
   return (
-    <div className="app">
-      <header className={desplazado ? 'barra con-contenido-debajo' : 'barra'}>
-        <div className="barra-contenido">
-          <NavLink to={inicioSegunRol(sesion.rol)} className="marca">
-            <span className="logo" aria-hidden="true">PL</span>
-            PrestaLab
-          </NavLink>
-          <nav aria-label="Principal">
-            {MENU[sesion.rol].map((item) => (
-              <NavLink key={item.a} to={item.a} end={item.fin}>
-                {({ isActive }) => (
-                  <>
-                    {/* Una sola píldora que se desliza de una sección a otra: indica dónde estás y de dónde vienes. */}
-                    {isActive && <motion.span layoutId="menu-activo" className="pildora" transition={RESORTE_RAPIDO} />}
-                    <span className="menu-texto">{item.texto}</span>
-                  </>
-                )}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="usuario">
-            <span>
-              {sesion.nombre}
-              <small>{sesion.rol === 'ADMIN' ? 'Administrador' : 'Estudiante'}</small>
-            </span>
-            <button type="button" className="boton boton-secundario" onClick={() => cerrarSesion()}>
-              Salir
-            </button>
-          </div>
-        </div>
-      </header>
-      <main className="contenido">
-        <Outlet />
-      </main>
-    </div>
+    <ContextoCola.Provider value={{ pendientes, recargarCola }}>
+      <div className="app">
+        <aside className="lateral">
+          <Marcador sesion={sesion} />
+          <Menu items={items} pendientes={pendientes} />
+          <Persona sesion={sesion} alSalir={() => cerrarSesion()} />
+        </aside>
+
+        {/* En el celular el marco se pliega: barra de 48px con el menú y el nombre de la pantalla. */}
+        <header className="barra-movil">
+          <button type="button" className="boton-menu" aria-label="Abrir el menú" aria-expanded={menuAbierto}
+                  onClick={() => setMenuAbierto(true)}>
+            <IconoMenu />
+          </button>
+          <strong>{actual?.texto ?? 'PrestaLab'}</strong>
+        </header>
+        <AnimatePresence>
+          {menuAbierto && (
+            <>
+              <motion.div key="velo" className="velo" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }} transition={RESORTE} onPointerDown={() => setMenuAbierto(false)} />
+              {/* Entra desde la izquierda, donde está el botón, y sale por el mismo lado. */}
+              <motion.div key="menu" className="menu-movil" role="dialog" aria-modal="true" aria-label="Menú"
+                          initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={RESORTE}>
+                <Marcador sesion={sesion} />
+                <Menu items={items} pendientes={pendientes} alElegir={() => setMenuAbierto(false)} />
+                <Persona sesion={sesion} alSalir={() => cerrarSesion()} />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        <main className="hoja-trabajo">
+          <Outlet />
+        </main>
+      </div>
+    </ContextoCola.Provider>
   );
 }

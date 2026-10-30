@@ -60,8 +60,10 @@ describe('flujos de la interfaz', () => {
   it('el administrador inicia sesión, ve el panel y la primera petición ya lleva el token', async () => {
     const fetchFalso = simularApi({
       'POST /api/v1/auth/login': [200, { token: TOKEN_ADMIN, tipo: 'Bearer', expiraEnSegundos: 3600, rol: 'ADMIN' }],
-      'GET /api/v1/dashboard/resumen': [200, { disponibles: 6, prestados: 2, enMantenimiento: 1, vencidos: 0 }],
+      'GET /api/v1/equipos': [200, [EQUIPO, { ...EQUIPO, id: 6, codigo: 'CAM-001', categoria: 'CAMARA', estado: 'PRESTADO' }]],
       'GET /api/v1/prestamos/pendientes': [200, []],
+      'GET /api/v1/prestamos/por-devolver': [200, []],
+      'GET /api/v1/dashboard/resumen': [200, { disponibles: 1, prestados: 1, enMantenimiento: 0, vencidos: 0 }],
     });
     montar('/login');
 
@@ -70,9 +72,11 @@ describe('flujos de la interfaz', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Entrar' }));
 
     expect(await screen.findByRole('heading', { name: 'Panel del laboratorio' })).toBeTruthy();
-    expect(await screen.findByText('6')).toBeTruthy();
-    const resumen = fetchFalso.mock.calls.find(([url]) => url === '/api/v1/dashboard/resumen');
-    expect(resumen[1].headers.Authorization).toBe(`Bearer ${TOKEN_ADMIN}`);
+    // Las cifras del estante salen de la misma lista de equipos que lo dibuja.
+    expect(await screen.findByRole('tab', { name: 'Prestados 1' })).toBeTruthy();
+    expect(screen.getByText('Todo al día: no hay solicitudes por aprobar ni devoluciones atrasadas.')).toBeTruthy();
+    const equipos = fetchFalso.mock.calls.find(([url]) => url === '/api/v1/equipos');
+    expect(equipos[1].headers.Authorization).toBe(`Bearer ${TOKEN_ADMIN}`);
   });
 
   it('muestra el mensaje uniforme del backend cuando las credenciales fallan', async () => {
@@ -90,16 +94,17 @@ describe('flujos de la interfaz', () => {
 
   it('un estudiante no entra a las pantallas del administrador', async () => {
     sessionStorage.setItem('prestalab.token', TOKEN_ESTUDIANTE);
-    simularApi({ 'GET /api/v1/equipos?soloDisponibles=true': [200, [EQUIPO]] });
+    simularApi({ 'GET /api/v1/equipos': [200, [EQUIPO]], 'GET /api/v1/prestamos/mios': [200, []] });
     montar('/admin');
-    expect(await screen.findByRole('heading', { name: 'Catálogo de equipos' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Catálogo' })).toBeTruthy();
   });
 
   it('el estudiante solicita un préstamo desde el catálogo (RF04)', async () => {
     sessionStorage.setItem('prestalab.token', TOKEN_ESTUDIANTE);
     let enviado = null;
     simularApi({
-      'GET /api/v1/equipos?soloDisponibles=true': [200, [EQUIPO]],
+      'GET /api/v1/equipos': [200, [EQUIPO]],
+      'GET /api/v1/prestamos/mios': [200, []],
       'POST /api/v1/prestamos': (opciones) => {
         enviado = JSON.parse(opciones.body);
         return [201, { id: 30, nombreEquipo: 'Portátil Lenovo', estado: 'PENDIENTE' }];
@@ -118,7 +123,8 @@ describe('flujos de la interfaz', () => {
   it('muestra la regla de negocio que devuelve la API (422)', async () => {
     sessionStorage.setItem('prestalab.token', TOKEN_ESTUDIANTE);
     simularApi({
-      'GET /api/v1/equipos?soloDisponibles=true': [200, [EQUIPO]],
+      'GET /api/v1/equipos': [200, [EQUIPO]],
+      'GET /api/v1/prestamos/mios': [200, []],
       'POST /api/v1/prestamos': [422, { codigo: 'REGLA_NEGOCIO', detail: 'Ya tienes 2 préstamos activos' }],
     });
     montar('/catalogo');
@@ -127,6 +133,19 @@ describe('flujos de la interfaz', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Confirmar solicitud' }));
 
     expect((await screen.findByRole('alert')).textContent).toContain('Ya tienes 2 préstamos activos');
+  });
+
+  it('con 2 préstamos activos el catálogo lo dice antes de intentar y no deja solicitar (RN01)', async () => {
+    sessionStorage.setItem('prestalab.token', TOKEN_ESTUDIANTE);
+    const activo = (id, estado) => ({ id, estado, nombreEquipo: 'Cámara', fechaSolicitud: '2026-10-01', fechaDevolucionEsperada: '2026-10-05' });
+    simularApi({
+      'GET /api/v1/equipos': [200, [EQUIPO]],
+      'GET /api/v1/prestamos/mios': [200, [activo(1, 'APROBADO'), activo(2, 'PENDIENTE')]],
+    });
+    montar('/catalogo');
+
+    expect(await screen.findByText('Ya tienes 2 préstamos activos: devuelve uno para pedir otro.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Solicitar préstamo' }).disabled).toBe(true);
   });
 
   it('valida la contraseña mientras se escribe, incluido el límite de 72 bytes de BCrypt', async () => {
@@ -149,6 +168,8 @@ describe('flujos de la interfaz', () => {
     const fetchFalso = simularApi({
       'GET /api/v1/usuarios/estudiantes': () =>
         [200, [{ id: 7, nombre: 'Laura Gómez', correo: 'laura@uni.edu.co', rol: 'ESTUDIANTE', activo }]],
+      'GET /api/v1/prestamos/pendientes': [200, []],
+      'GET /api/v1/prestamos/por-devolver': [200, []],
       'POST /api/v1/usuarios/7/desactivar': () => { activo = false; return [204]; },
       'POST /api/v1/usuarios/7/activar': () => { activo = true; return [204]; },
     });
