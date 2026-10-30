@@ -236,6 +236,31 @@ class PrestamoServiceImplTest {
             verificarQueNoSeGuardoNiNotifico();
         }
 
+        @Test
+        void rn01SimultaneaLaDetieneLaBaseDeDatosAntesDeNotificar() {
+            prepararReglasQuePasan();
+            when(usuarioRepository.findById(USUARIO_ID)).thenReturn(Optional.of(usuario));
+            when(prestamoRepository.save(any(Prestamo.class)))
+                    .thenThrow(new DataIntegrityViolationException("ck_prestamos_rn01: el usuario 7 ya tiene 2"));
+
+            assertThatThrownBy(() -> servicio.solicitarPrestamo(USUARIO_ID, solicitud))
+                    .isInstanceOf(ReglaNegocioException.class)
+                    .hasMessage("Ya tienes 2 préstamos activos");
+            verifyNoInteractions(notificador);
+        }
+
+        @Test
+        void otraViolacionDeIntegridadNoSeConfundeConRn01() {
+            prepararReglasQuePasan();
+            when(usuarioRepository.findById(USUARIO_ID)).thenReturn(Optional.of(usuario));
+            when(prestamoRepository.save(any(Prestamo.class)))
+                    .thenThrow(new DataIntegrityViolationException("fk_prestamos_equipo"));
+
+            assertThatThrownBy(() -> servicio.solicitarPrestamo(USUARIO_ID, solicitud))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+            verifyNoInteractions(notificador);
+        }
+
         private void prepararReglasQuePasan() {
             when(equipoRepository.findById(EQUIPO_ID)).thenReturn(Optional.of(equipoDisponible()));
             when(prestamoRepository.countByUsuarioIdAndEstadoIn(USUARIO_ID, ACTIVOS)).thenReturn(0L);
@@ -289,6 +314,19 @@ class PrestamoServiceImplTest {
         }
 
         @Test
+        void aprobarUnPrestamoQueOtraOperacionYaCambioEsUn409() {
+            Prestamo prestamo = pendiente();
+            when(prestamoRepository.findById(10L)).thenReturn(Optional.of(prestamo));
+            when(prestamoRepository.saveAndFlush(prestamo)).thenThrow(new DataIntegrityViolationException(
+                    "ck_prestamos_transicion: el préstamo 10 no puede pasar de RECHAZADO a APROBADO"));
+
+            assertThatThrownBy(() -> servicio.aprobarPrestamo(10L))
+                    .isInstanceOf(TransicionInvalidaException.class)
+                    .hasMessageContaining("otra operación simultánea");
+            verifyNoInteractions(notificador);
+        }
+
+        @Test
         void prestamoInexistente() {
             when(prestamoRepository.findById(15L)).thenReturn(Optional.empty());
 
@@ -317,13 +355,13 @@ class PrestamoServiceImplTest {
         void rechazaGuardaYNotificaUnaVez() {
             Prestamo prestamo = pendiente();
             when(prestamoRepository.findById(10L)).thenReturn(Optional.of(prestamo));
-            when(prestamoRepository.save(prestamo)).thenReturn(prestamo);
+            when(prestamoRepository.saveAndFlush(prestamo)).thenReturn(prestamo);
 
             PrestamoDTO resultado = servicio.rechazarPrestamo(10L, "Equipo reservado");
 
             InOrder orden = inOrder(prestamoRepository, notificador);
             orden.verify(prestamoRepository).findById(10L);
-            orden.verify(prestamoRepository).save(prestamo);
+            orden.verify(prestamoRepository).saveAndFlush(prestamo);
             orden.verify(notificador, times(1)).notificarCambioEstado(prestamo);
             assertThat(resultado.estado()).isEqualTo(EstadoPrestamo.RECHAZADO);
             assertThat(resultado.motivoRechazo()).isEqualTo("Equipo reservado");
@@ -335,7 +373,20 @@ class PrestamoServiceImplTest {
 
             assertThatThrownBy(() -> servicio.rechazarPrestamo(10L, "  "))
                     .isInstanceOf(TransicionInvalidaException.class);
-            verify(prestamoRepository, never()).save(any());
+            verify(prestamoRepository, never()).saveAndFlush(any());
+            verifyNoInteractions(notificador);
+        }
+
+        @Test
+        void rechazarUnPrestamoQueOtraOperacionYaAproboEsUn409SinCorreo() {
+            Prestamo prestamo = pendiente();
+            when(prestamoRepository.findById(10L)).thenReturn(Optional.of(prestamo));
+            when(prestamoRepository.saveAndFlush(prestamo)).thenThrow(new DataIntegrityViolationException(
+                    "ck_prestamos_transicion: el préstamo 10 no puede pasar de APROBADO a RECHAZADO"));
+
+            assertThatThrownBy(() -> servicio.rechazarPrestamo(10L, "Sin cupo"))
+                    .isInstanceOf(TransicionInvalidaException.class)
+                    .hasMessageContaining("otra operación simultánea");
             verifyNoInteractions(notificador);
         }
 
@@ -354,7 +405,7 @@ class PrestamoServiceImplTest {
         void devuelveUnAprobadoYLiberaElEquipo() {
             Prestamo prestamo = aprobado(HOY, HOY.plusDays(2));
             when(prestamoRepository.findById(10L)).thenReturn(Optional.of(prestamo));
-            when(prestamoRepository.save(prestamo)).thenReturn(prestamo);
+            when(prestamoRepository.saveAndFlush(prestamo)).thenReturn(prestamo);
 
             PrestamoDTO resultado = servicio.registrarDevolucion(10L);
 
@@ -369,7 +420,7 @@ class PrestamoServiceImplTest {
             Prestamo prestamo = aprobado(HOY.minusDays(10), HOY.minusDays(5));
             prestamo.marcarVencido();
             when(prestamoRepository.findById(10L)).thenReturn(Optional.of(prestamo));
-            when(prestamoRepository.save(prestamo)).thenReturn(prestamo);
+            when(prestamoRepository.saveAndFlush(prestamo)).thenReturn(prestamo);
 
             assertThat(servicio.registrarDevolucion(10L).estado()).isEqualTo(EstadoPrestamo.DEVUELTO);
             verify(notificador, times(1)).notificarCambioEstado(prestamo);
@@ -378,6 +429,18 @@ class PrestamoServiceImplTest {
         @Test
         void unPendienteNoSeDevuelve() {
             when(prestamoRepository.findById(10L)).thenReturn(Optional.of(pendiente()));
+
+            assertThatThrownBy(() -> servicio.registrarDevolucion(10L))
+                    .isInstanceOf(TransicionInvalidaException.class);
+            verifyNoInteractions(notificador);
+        }
+
+        @Test
+        void devolverDosVecesALaVezEsUn409SinSegundoCorreo() {
+            Prestamo prestamo = aprobado(HOY, HOY.plusDays(2));
+            when(prestamoRepository.findById(10L)).thenReturn(Optional.of(prestamo));
+            when(prestamoRepository.saveAndFlush(prestamo)).thenThrow(new DataIntegrityViolationException(
+                    "ck_prestamos_transicion: el préstamo 10 no puede pasar de DEVUELTO a DEVUELTO"));
 
             assertThatThrownBy(() -> servicio.registrarDevolucion(10L))
                     .isInstanceOf(TransicionInvalidaException.class);
