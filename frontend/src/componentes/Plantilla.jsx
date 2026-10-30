@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Outlet } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { useSesion } from '../auth/Sesion.jsx';
+import { RESORTE_RAPIDO } from '../util/movimiento.js';
 
 const MENU = {
   ESTUDIANTE: [
@@ -33,11 +36,24 @@ export function RutaProtegida({ rol }) {
   return <Outlet />;
 }
 
+/** El borde de la barra solo aparece cuando hay contenido pasando por debajo de ella. */
+function useDesplazado() {
+  const [desplazado, setDesplazado] = useState(false);
+  useEffect(() => {
+    const revisar = () => setDesplazado(window.scrollY > 4);
+    revisar();
+    window.addEventListener('scroll', revisar, { passive: true });
+    return () => window.removeEventListener('scroll', revisar);
+  }, []);
+  return desplazado;
+}
+
 export function Plantilla() {
   const { sesion, cerrarSesion } = useSesion();
+  const desplazado = useDesplazado();
   return (
     <div className="app">
-      <header className="barra">
+      <header className={desplazado ? 'barra con-contenido-debajo' : 'barra'}>
         <div className="barra-contenido">
           <NavLink to={inicioSegunRol(sesion.rol)} className="marca">
             <span className="logo" aria-hidden="true">PL</span>
@@ -46,7 +62,13 @@ export function Plantilla() {
           <nav aria-label="Principal">
             {MENU[sesion.rol].map((item) => (
               <NavLink key={item.a} to={item.a} end={item.fin}>
-                {item.texto}
+                {({ isActive }) => (
+                  <>
+                    {/* Una sola píldora que se desliza de una sección a otra: indica dónde estás y de dónde vienes. */}
+                    {isActive && <motion.span layoutId="menu-activo" className="pildora" transition={RESORTE_RAPIDO} />}
+                    <span className="menu-texto">{item.texto}</span>
+                  </>
+                )}
               </NavLink>
             ))}
           </nav>

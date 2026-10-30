@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.jsx';
 import { ProveedorSesion } from '../auth/Sesion.jsx';
+import { ProveedorAvisos } from '../componentes/Comunes.jsx';
 import { FUTURO_ROUTER, tokenDePrueba } from './ayudas.js';
 
 const DENTRO_DE_UNA_HORA = Math.floor(Date.now() / 1000) + 3600;
@@ -30,7 +31,9 @@ function montar(ruta) {
   return render(
     <MemoryRouter initialEntries={[ruta]} future={FUTURO_ROUTER}>
       <ProveedorSesion>
-        <App />
+        <ProveedorAvisos>
+          <App />
+        </ProveedorAvisos>
       </ProveedorSesion>
     </MemoryRouter>,
   );
@@ -124,6 +127,41 @@ describe('flujos de la interfaz', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Confirmar solicitud' }));
 
     expect((await screen.findByRole('alert')).textContent).toContain('Ya tienes 2 préstamos activos');
+  });
+
+  it('valida la contraseña mientras se escribe, incluido el límite de 72 bytes de BCrypt', async () => {
+    simularApi({});
+    montar('/registro');
+    const campo = await screen.findByLabelText('Contraseña');
+
+    await userEvent.type(campo, 'abc');
+    expect(screen.getByText('Faltan 5 caracteres.')).toBeTruthy();
+
+    await userEvent.clear(campo);
+    await userEvent.type(campo, 'ñ'.repeat(40));
+    expect(screen.getByText(/Demasiado larga/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Crear cuenta' }).disabled).toBe(true);
+  });
+
+  it('desactivar a un estudiante se confirma con un aviso que permite deshacerlo', async () => {
+    sessionStorage.setItem('prestalab.token', TOKEN_ADMIN);
+    let activo = true;
+    const fetchFalso = simularApi({
+      'GET /api/v1/usuarios/estudiantes': () =>
+        [200, [{ id: 7, nombre: 'Laura Gómez', correo: 'laura@uni.edu.co', rol: 'ESTUDIANTE', activo }]],
+      'POST /api/v1/usuarios/7/desactivar': () => { activo = false; return [204]; },
+      'POST /api/v1/usuarios/7/activar': () => { activo = true; return [204]; },
+    });
+    montar('/admin/estudiantes');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Desactivar' }));
+    expect(await screen.findByText('Desactivaste la cuenta de Laura Gómez.')).toBeTruthy();
+    expect(await screen.findByText('Desactivada')).toBeTruthy();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Deshacer' }));
+    expect(await screen.findByText('Se deshizo el cambio.')).toBeTruthy();
+    expect(await screen.findByText('Activa')).toBeTruthy();
+    expect(fetchFalso.mock.calls.some(([url]) => url === '/api/v1/usuarios/7/activar')).toBe(true);
   });
 
   it('si el token vence en el servidor, vuelve al inicio de sesión con un aviso', async () => {
