@@ -1,0 +1,66 @@
+# Configuración de PrestaLab (API REST).
+# Los valores de conexión y el secreto JWT llegan por variables de entorno (D8), que Spring Boot enlaza solas:
+#   SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD,
+#   SPRING_MAIL_HOST, SPRING_MAIL_PORT, PRESTALAB_JWT_SECRET
+# Los valores de este archivo son solo los predeterminados para desarrollo local; aquí no hay secretos.
+spring:
+  application:
+    name: prestalab
+  datasource:
+    url: jdbc:postgresql://localhost:5432/prestalab
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      mail:
+        smtp:
+          auth: false
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      # Un cliente no puede colar campos como "rol" o "estado": cualquier propiedad desconocida es un 400.
+      fail-on-unknown-properties: true
+  thymeleaf:
+    # Thymeleaf solo procesa las plantillas de correo; no hay vistas web.
+    check-template-location: false
+
+server:
+  port: 8080
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+    include-exception: false
+    whitelabel:
+      enabled: false
+
+springdoc:
+  api-docs:
+    # En producción se puede apagar con SPRINGDOC_API_DOCS_ENABLED=false (D8: Swagger desactivado o protegido).
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+prestalab:
+  jwt:
+    secret: ${PRESTALAB_JWT_SECRET:}
+    expiracion-minutos: 60
+  mail:
+    remitente: no-reply@prestalab.local
