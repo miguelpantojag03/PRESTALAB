@@ -24,20 +24,33 @@ function useSacudida() {
   return [alcance, sacudir];
 }
 
+/**
+ * La banda azul marino de Notion con sus puntos de colores, junto al formulario. El titular de la banda es un
+ * párrafo: el único h1 de la página es el del formulario.
+ */
 function MarcoAcceso({ titulo, alcance, children }) {
   return (
     <div className="acceso">
-      <div className="acceso-tarjeta" ref={alcance}>
+      <aside className="acceso-banda">
         <div className="acceso-marca">
           <Marca tamano={32} />
           <div>
             <strong>PrestaLab</strong>
-            <small>Préstamo de equipos del laboratorio</small>
+            <small>Laboratorio universitario</small>
           </div>
         </div>
-        <h1>{titulo}</h1>
-        {children}
-      </div>
+        <div>
+          <p className="banda-titulo">Pide el equipo. Devuélvelo a tiempo.</p>
+          <p className="banda-sub">Portátiles, cámaras, proyectores y kits del laboratorio, por hasta 7 días.</p>
+        </div>
+        {['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((p) => <span key={p} className={`punto ${p}`} aria-hidden="true" />)}
+      </aside>
+      <main className="acceso-panel">
+        <div className="acceso-tarjeta" ref={alcance}>
+          <h1>{titulo}</h1>
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

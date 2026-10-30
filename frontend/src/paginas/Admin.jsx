@@ -6,7 +6,9 @@ import {
   Alerta, Conteos, Dialogo, ErrorBloque, EsqueletoFilas, EstadoEquipo, EstadoPrestamo, Tabla, Titulo, Vacio,
   useAvisos, useDialogo,
 } from '../componentes/Comunes.jsx';
-import { Avatar, IconoActualizar } from '../componentes/Iconos.jsx';
+import {
+  Avatar, IconoActualizar, IconoEquipos, IconoEstudiantes, IconoPanel, IconoPrestamos,
+} from '../componentes/Iconos.jsx';
 import { useCola } from '../componentes/Plantilla.jsx';
 import {
   CATEGORIAS, CATEGORIAS_PLURAL, ESTADOS_EQUIPO, cuandoDevolver, fechaCorta, formatearFecha, hoyEnBogota,
@@ -122,7 +124,8 @@ export function Panel() {
 
   return (
     <>
-      <Titulo titulo="Panel del laboratorio" hallazgo={hallazgo}>
+      <Titulo titulo="Panel del laboratorio" icono={<IconoPanel />}
+              callout={datos && { tono: vencidas > 0 ? 'durazno' : pendientes.length > 0 || vencenHoy > 0 ? 'amarillo' : 'menta', contenido: hallazgo }}>
         {datos && (
           <span className="sello">
             Actualizado a las {datos.consultado.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
@@ -223,7 +226,7 @@ export function Panel() {
           {/* Los indicadores son las pestañas del estante: el estado elegido toma el tono de datos. */}
           <div className="kpis" role="tablist" aria-label="Equipos por estado">
             {indicadores.map((k) => (
-              <button key={k.valor} type="button" role="tab" className="kpi" aria-selected={estadoMarcado === k.valor}
+              <button key={k.valor} type="button" role="tab" className="kpi" data-estado={k.valor} aria-selected={estadoMarcado === k.valor}
                       onClick={() => setEstadoMarcado(k.valor)}>
                 <span className="kpi-etiqueta">{k.texto}</span>
                 <span className="kpi-valor">{datos ? cuenta(k.valor) : '–'}</span>
@@ -271,7 +274,7 @@ function Estante({ equipos, marcado, prestamoDe }) {
                 const detalle = p ? `${e.nombre} · con ${p.nombreUsuario} hasta el ${fechaCorta(p.fechaDevolucionEsperada)}`
                   : `${e.nombre} · ${ESTADOS_EQUIPO[e.estado]}`;
                 return (
-                  <span key={e.id} className={e.estado === marcado ? 'celda marcada' : 'celda'} title={detalle}
+                  <span key={e.id} data-estado={e.estado} className={e.estado === marcado ? 'celda marcada' : 'celda'} title={detalle}
                         aria-label={detalle}>
                     {e.codigo}
                   </span>
@@ -282,7 +285,7 @@ function Estante({ equipos, marcado, prestamoDe }) {
         ))}
       </div>
       <div className="estante-leyenda" aria-hidden="true">
-        <span><i className="muestra marcada" /> {ESTADOS_EQUIPO[marcado]}</span>
+        <span><i className="muestra marcada" data-estado={marcado} /> {ESTADOS_EQUIPO[marcado]}</span>
         <span><i className="muestra" /> Los demás</span>
       </div>
     </>
@@ -374,7 +377,7 @@ export function Prestamos() {
 
   return (
     <>
-      <Titulo titulo="Préstamos" hallazgo="Aprueba o rechaza las solicitudes y registra lo que vuelve al laboratorio." />
+      <Titulo titulo="Préstamos" icono={<IconoPrestamos />} hallazgo="Aprueba o rechaza las solicitudes y registra lo que vuelve al laboratorio." />
       <Conteos etiqueta="Préstamos por estado" valor={vista} alCambiar={setVista} opciones={[
         { valor: 'pendientes', texto: 'Por aprobar', cuenta: datos && vistas.pendientes.length },
         { valor: 'por-devolver', texto: 'Por devolver', cuenta: datos && vistas['por-devolver'].length },
@@ -465,7 +468,7 @@ export function Equipos() {
   const columnas = [
     { titulo: 'Código', ancho: 112, celda: (eq) => <span className="mono">{eq.codigo}</span> },
     { titulo: 'Equipo', celda: (eq) => <>{eq.nombre}{eq.descripcion && <span className="sub recortar">{eq.descripcion}</span>}</> },
-    { titulo: 'Categoría', celda: (eq) => CATEGORIAS[eq.categoria] },
+    { titulo: 'Categoría', celda: (eq) => <span className="no-partir">{CATEGORIAS[eq.categoria]}</span> },
     { titulo: 'Estado', celda: (eq) => <EstadoEquipo estado={eq.estado} /> },
     { titulo: 'Dónde está', celda: (eq) => ubicacion(eq) },
     { titulo: '', acciones: true, celda: (eq) => accionesEquipo(eq) },
@@ -473,7 +476,7 @@ export function Equipos() {
 
   return (
     <>
-      <Titulo titulo="Equipos" hallazgo={datos && `${equipos.length} equipos activos en el inventario.`}>
+      <Titulo titulo="Equipos" icono={<IconoEquipos />} hallazgo={datos && `${equipos.length} equipos activos en el inventario.`}>
         <button type="button" className="boton primario" onClick={() => edicion.abrir({})}>Nuevo equipo</button>
       </Titulo>
       <Conteos etiqueta="Equipos por estado" valor={vista} alCambiar={setVista} opciones={[
@@ -649,7 +652,7 @@ export function Estudiantes() {
 
   return (
     <>
-      <Titulo titulo="Estudiantes" hallazgo="Una cuenta desactivada no puede iniciar sesión ni pedir préstamos." />
+      <Titulo titulo="Estudiantes" icono={<IconoEstudiantes />} hallazgo="Una cuenta desactivada no puede iniciar sesión ni pedir préstamos." />
       <Conteos etiqueta="Cuentas" valor={vista} alCambiar={setVista} opciones={[
         { valor: 'TODAS', texto: 'Todas', cuenta: datos && estudiantes.length },
         { valor: 'ACTIVAS', texto: 'Activas', cuenta: datos && activas },

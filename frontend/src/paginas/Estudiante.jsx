@@ -9,6 +9,7 @@ import {
 import {
   CATEGORIAS, CATEGORIAS_PLURAL, cuandoDevolver, fechaCorta, formatearFecha, formatearFechaHora, hoyEnBogota, sumarDias,
 } from '../util/formato.js';
+import { IconoCatalogo, IconoHistorial } from '../componentes/Iconos.jsx';
 import { RESORTE } from '../util/movimiento.js';
 import { useCarga } from '../util/useCarga.js';
 
@@ -48,21 +49,26 @@ export function Catalogo() {
 
   return (
     <>
-      <Titulo titulo="Catálogo" hallazgo={hallazgo}>
+      {/* El cupo (RN01) va en un callout: es lo primero que el estudiante necesita saber antes de pedir. */}
+      <Titulo titulo="Catálogo" icono={<IconoCatalogo />}
+              hallazgo={datos && `${activos} de ${MAXIMO_ACTIVOS} préstamos activos`}
+              callout={datos && {
+                tono: sinCupo ? 'durazno' : 'menta',
+                contenido: (
+                  <>
+                    <span className="cupo-pista" aria-hidden="true">
+                      {Array.from({ length: MAXIMO_ACTIVOS }, (_, i) => <span key={i} className={i < activos ? 'lleno' : undefined} />)}
+                    </span>
+                    {hallazgo}
+                    {activos > 0 && <> <Link to="/mis-prestamos" className="enlace">Ver los míos</Link></>}
+                  </>
+                ),
+              }}>
         <label className="interruptor">
           <input type="checkbox" role="switch" checked={soloDisponibles} onChange={(e) => setSoloDisponibles(e.target.checked)} />
           Solo disponibles
         </label>
       </Titulo>
-      {datos && (
-        <div className="cupo" aria-label={`Préstamos activos: ${activos} de ${MAXIMO_ACTIVOS}`}>
-          <span className="cupo-pista" aria-hidden="true">
-            {Array.from({ length: MAXIMO_ACTIVOS }, (_, i) => <span key={i} className={i < activos ? 'lleno' : undefined} />)}
-          </span>
-          <span className="tenue">{activos} de {MAXIMO_ACTIVOS} préstamos activos</span>
-          {activos > 0 && <Link to="/mis-prestamos" className="enlace">Ver los míos</Link>}
-        </div>
-      )}
       <Conteos etiqueta="Categorías" valor={categoria} alCambiar={setCategoria} opciones={opciones} />
       {error ? <ErrorBloque que="el catálogo" error={error} alReintentar={recargar} />
         : !datos ? <EsqueletoFilas filas={3} />
@@ -210,7 +216,8 @@ export function MisPrestamos() {
 
   return (
     <>
-      <Titulo titulo="Mis préstamos" hallazgo={hallazgo}>
+      <Titulo titulo="Mis préstamos" icono={<IconoHistorial />}
+              callout={prestamos && { tono: proximo ? 'amarillo' : '', contenido: hallazgo }}>
         <Link to="/catalogo" className="boton primario">Pedir un equipo</Link>
       </Titulo>
       {error ? <ErrorBloque que="tus préstamos" error={error} alReintentar={recargar} />

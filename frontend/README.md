@@ -17,19 +17,27 @@ Aplicación web en React 18 + Vite que consume la API `/api/v1` del backend. Las
 
 ## Diseño de la interfaz
 
-El diseño combina dos fuentes:
+El diseño combina tres fuentes:
 
-- **El aspecto** sigue el estilo *Framed sheet* de tasteskill para pantallas de aplicación (semilla 1664243803). Un
-  marco teñido en L sostiene una hoja blanca con borde de 1px, sin sombras en reposo. El color va en los datos y no
-  en el chrome: el primario es casi negro y un único tono (`--dato`) marca lo que el administrador sigue con la
-  vista. La tipografía es IBM Plex Sans, servida desde el propio contenedor; IBM Plex Mono se usa solo para los
-  códigos de inventario y los números de préstamo.
+- **El aspecto** sigue el [DESIGN.md de Notion](https://github.com/VoltAgent/awesome-design-md/tree/main/design-md/notion)
+  de la colección awesome-design-md. De ahí salen el lienzo blanco con la barra lateral `#f6f5f4`, los bordes cálidos
+  `#e5e3df` y la tinta `#37352f`; el violeta `#5645d4` solo en la acción principal de cada pantalla; los botones
+  rectangulares de 8px y las tarjetas de 12px; las etiquetas pastel como las propiedades de sus bases de datos; el
+  ícono de página, los callouts y las pestañas en píldora; y la banda azul marino con puntos de colores en el acceso.
+  Se toma el sistema de diseño, no la marca: PrestaLab conserva su nombre y su marca.
+- **La estructura** de cada pantalla viene del trabajo anterior con tasteskill: cada pantalla responde una pregunta
+  primero (tabla de abajo), hay estados de carga, vacío y error, y "El estante" es el elemento propio del producto.
 - **El movimiento** sigue los principios de Apple (*Designing Fluid Interfaces*, WWDC), con
-  [Motion](https://motion.dev): resortes interrumpibles, gestos 1:1 y proyección de impulso. En una aplicación el
-  movimiento es retroalimentación: nada hace una entrada decorativa.
+  [Motion](https://motion.dev): resortes interrumpibles, gestos 1:1 y proyección de impulso.
 
-Donde las dos chocaban se aplicó tasteskill, la más reciente: no hay vidrio ni `backdrop-filter`, ni gradientes, ni
-sombras en reposo.
+Ajustes propios sobre el DESIGN.md, anotados en `src/estilos.css`:
+
+- "Notion Sans" es privada, así que se usa **Inter**, el respaldo que indica el propio documento. Se sirve desde el
+  contenedor.
+- El texto de las etiquetas usa el tono profundo de cada familia (por ejemplo, `#1c6b31` sobre menta) para llegar
+  a 4.5:1. El verde del documento, `#1aae39` sobre menta, da 2.6:1.
+- El documento no trae **modo oscuro** (lo dice en "Known Gaps"). Se extrapola de los grises cálidos de la app de
+  Notion.
 
 **Cada pantalla responde una pregunta primero:**
 
@@ -43,8 +51,9 @@ sombras en reposo.
 | Mis préstamos | ¿Qué tengo y cuándo lo devuelvo? | La próxima devolución, en palabras ("En 3 días") |
 
 **El estante**, en el Panel, es el elemento propio de PrestaLab. Cada equipo activo es una celda con su código,
-agrupada por categoría. Los indicadores de estado son sus pestañas: las celdas del estado elegido toman el tono de
-datos, y el título de cada celda dice quién tiene el equipo y hasta cuándo.
+agrupada por categoría. Los indicadores de estado son tarjetas pastel (menta, cielo y durazno) que funcionan como
+pestañas: las celdas del estado elegido toman el color de esa propiedad, y el título de cada celda dice quién tiene
+el equipo y hasta cuándo.
 
 | Principio | Cómo se aplica |
 |---|---|
@@ -57,13 +66,9 @@ datos, y el título de cada celda dice quién tiene el equipo y hasta cuándo.
 | Celular | La barra lateral se pliega a una barra de 48px con menú; las tablas pasan a listas de dos líneas sin perder campos; los avisos aparecen arriba. |
 | Accesibilidad | Modo claro y oscuro, *reducir movimiento* y *aumentar contraste*. La ayuda de cada campo va fuera del `<label>`, enlazada con `aria-describedby`. |
 
-**Verificación:**
-
-- **Lint** de tasteskill sobre el código: 0 FAIL, 0 WARN. Los siete patrones que se conservan a propósito (la fuente
-  mono para IDs y las sombras de lo que flota) llevan su motivo en un comentario `taste-skill-ignore`.
-- **Inspector** en las seis pantallas, a 1440, 768 y 390px, con sesión real: 0 FAIL. Los avisos que quedan
-  (`hero-void`, `panel-void`) son el final de la hoja bajo listas cortas: el estilo lleva la hoja hasta el borde de
-  la ventana, y los datos se muestran a su tamaño real en lugar de rellenar con contenido inventado.
+**Verificación:** se revisaron capturas de cada pantalla en modo claro y oscuro, a 1440, 768 y 390px. El inspector
+de tasteskill se usó solo para medir contraste y desbordes (sus reglas de estilo, como la prohibición del violeta,
+no aplican a este sistema): sin problemas en las seis pantallas.
 
 ## Uso
 
