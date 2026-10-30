@@ -1,25 +1,44 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { api } from '../api/cliente.js';
 import {
-  Alerta, Cargando, Dialogo, Encabezado, EstadoEquipo, EstadoPrestamo, Vacio,
+  Alerta, Cargando, Dialogo, Encabezado, EstadoEquipo, EstadoPrestamo, Vacio, useAvisos, useDialogo,
 } from '../componentes/Comunes.jsx';
 import { CATEGORIAS, formatearFecha, hoyEnBogota } from '../util/formato.js';
+import { RESORTE, RESORTE_RAPIDO } from '../util/movimiento.js';
 import { useCarga } from '../util/useCarga.js';
 
-/** Ejecuta una acción del administrador y muestra su resultado; tras el éxito recarga la lista. */
+/**
+ * Ejecuta una acción del administrador. El éxito se confirma con un aviso; si la acción es reversible, el aviso
+ * ofrece Deshacer en lugar de pedir confirmación antes (la confirmación queda para lo irreversible).
+ * El error se muestra en línea, sobre la lista que lo causó.
+ */
 function useAccion(recargar) {
-  const [mensaje, setMensaje] = useState(null);
+  const { avisar } = useAvisos();
   const [error, setError] = useState(null);
   const [ocupado, setOcupado] = useState(null);
 
-  async function ejecutar(clave, accion, exito) {
+  async function ejecutar(clave, accion, exito, deshacer) {
     setOcupado(clave);
-    setMensaje(null);
     setError(null);
     try {
       await accion();
-      setMensaje(exito);
+      avisar({
+        texto: exito,
+        accion: deshacer && {
+          texto: 'Deshacer',
+          alHacer: async () => {
+            try {
+              await deshacer();
+              avisar('Se deshizo el cambio.');
+            } catch (e) {
+              setError(e);
+            }
+            await recargar();
+          },
+        },
+      });
       await recargar();
       return true;
     } catch (e) {
@@ -32,8 +51,17 @@ function useAccion(recargar) {
     }
   }
 
-  return { mensaje, error, ocupado, ejecutar };
+  return { error, ocupado, ejecutar };
 }
+
+/** Las filas que dejan la lista (aprobada, rechazada, devuelta) se van deslizando; las demás suben a su lugar. */
+const filaAnimada = {
+  layout: 'position',
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0, x: 32 },
+  transition: RESORTE,
+};
 
 /** RF10: resumen del panel. */
 export function Panel() {
@@ -57,7 +85,7 @@ export function Panel() {
           </div>
         ))}
       </div>
-      <div className="tarjeta aviso">
+      <div className="tarjeta aviso-panel">
         <div>
           <h2>Solicitudes pendientes</h2>
           <p className="tenue">
@@ -74,6 +102,23 @@ export function Panel() {
   );
 }
 
+function Pestanas({ valor, alCambiar, opciones }) {
+  return (
+    <div className="pestanas" role="tablist">
+      {opciones.map((o) => (
+        <button key={o.valor} type="button" role="tab" aria-selected={valor === o.valor}
+                onClick={() => alCambiar(o.valor)}>
+          {o.texto}
+          {o.cuenta != null && <span className="contador">{o.cuenta}</span>}
+          {valor === o.valor && (
+            <motion.span layoutId="pestana-activa" className="pestana-indicador" transition={RESORTE_RAPIDO} />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** RF05 y RF06: aprobar o rechazar solicitudes y registrar devoluciones. */
 export function Prestamos() {
   const [pestana, setPestana] = useState('pendientes');
@@ -83,31 +128,25 @@ export function Prestamos() {
     await Promise.all([pendientes.recargar(), porDevolver.recargar()]);
   };
   const accion = useAccion(recargarTodo);
-  const [rechazando, setRechazando] = useState(null);
+  const rechazo = useDialogo();
   const lista = pestana === 'pendientes' ? pendientes : porDevolver;
   const hoy = hoyEnBogota();
 
   return (
     <>
       <Encabezado titulo="Préstamos" descripcion="Aprueba o rechaza solicitudes y registra las devoluciones." />
-      <div className="pestanas" role="tablist">
-        <button type="button" role="tab" aria-selected={pestana === 'pendientes'}
-                onClick={() => setPestana('pendientes')}>
-          Pendientes {pendientes.datos && <span className="contador">{pendientes.datos.length}</span>}
-        </button>
-        <button type="button" role="tab" aria-selected={pestana === 'por-devolver'}
-                onClick={() => setPestana('por-devolver')}>
-          Por devolver {porDevolver.datos && <span className="contador">{porDevolver.datos.length}</span>}
-        </button>
-      </div>
-      {accion.mensaje && <Alerta tipo="exito">{accion.mensaje}</Alerta>}
+      <Pestanas valor={pestana} alCambiar={setPestana} opciones={[
+        { valor: 'pendientes', texto: 'Pendientes', cuenta: pendientes.datos?.length },
+        { valor: 'por-devolver', texto: 'Por devolver', cuenta: porDevolver.datos?.length },
+      ]} />
       <Alerta error={accion.error || lista.error} />
       {lista.cargando && !lista.datos ? (
         <Cargando />
       ) : lista.datos?.length === 0 ? (
         <Vacio>{pestana === 'pendientes' ? 'No hay solicitudes pendientes.' : 'No hay equipos por devolver.'}</Vacio>
       ) : (
-        <div className="tabla-contenedor">
+        // La tabla se monta de nuevo al cambiar de pestaña: solo se animan las filas que salen por una acción.
+        <div className="tabla-contenedor" key={pestana}>
           <table>
             <thead>
               <tr>
@@ -121,74 +160,79 @@ export function Prestamos() {
               </tr>
             </thead>
             <tbody>
-              {lista.datos?.map((p) => (
-                <tr key={p.id} className={p.estado === 'APROBADO' && p.fechaDevolucionEsperada < hoy ? 'atrasado' : ''}>
-                  <td>{p.id}</td>
-                  <td>{p.nombreUsuario}<br /><small className="tenue">{p.correoUsuario}</small></td>
-                  <td><span className="codigo">{p.codigoEquipo}</span> {p.nombreEquipo}</td>
-                  <td>{formatearFecha(p.fechaSolicitud)}</td>
-                  <td>{formatearFecha(p.fechaDevolucionEsperada)}</td>
-                  <td><EstadoPrestamo estado={p.estado} /></td>
-                  <td className="celda-acciones">
-                    {pestana === 'pendientes' ? (
-                      <>
+              <AnimatePresence initial={false}>
+                {lista.datos?.map((p) => (
+                  <motion.tr key={p.id} {...filaAnimada}
+                             className={p.estado === 'APROBADO' && p.fechaDevolucionEsperada < hoy ? 'atrasado' : ''}>
+                    <td className="numero" data-etiqueta="Préstamo">{p.id}</td>
+                    <td data-etiqueta="Estudiante">
+                      <span>{p.nombreUsuario}<br /><small className="tenue">{p.correoUsuario}</small></span>
+                    </td>
+                    <td data-etiqueta="Equipo"><span><span className="codigo">{p.codigoEquipo}</span> {p.nombreEquipo}</span></td>
+                    <td data-etiqueta="Solicitado">{formatearFecha(p.fechaSolicitud)}</td>
+                    <td data-etiqueta="Devolver el">{formatearFecha(p.fechaDevolucionEsperada)}</td>
+                    <td data-etiqueta="Estado"><EstadoPrestamo estado={p.estado} /></td>
+                    <td className="celda-acciones">
+                      {pestana === 'pendientes' ? (
+                        <>
+                          <button type="button" className="boton" disabled={accion.ocupado !== null}
+                                  onClick={() => accion.ejecutar(p.id, () => api.aprobarPrestamo(p.id),
+                                    `Aprobaste el préstamo #${p.id}. El equipo ${p.codigoEquipo} quedó PRESTADO.`)}>
+                            Aprobar
+                          </button>
+                          <button type="button" className="boton boton-peligro" disabled={accion.ocupado !== null}
+                                  onClick={() => rechazo.abrir(p)}>
+                            Rechazar
+                          </button>
+                        </>
+                      ) : (
                         <button type="button" className="boton" disabled={accion.ocupado !== null}
-                                onClick={() => accion.ejecutar(p.id, () => api.aprobarPrestamo(p.id),
-                                  `Aprobaste el préstamo #${p.id}. El equipo ${p.codigoEquipo} quedó PRESTADO.`)}>
-                          Aprobar
+                                onClick={() => accion.ejecutar(p.id, () => api.devolverPrestamo(p.id),
+                                  `Registraste la devolución del préstamo #${p.id}.`)}>
+                          Registrar devolución
                         </button>
-                        <button type="button" className="boton boton-peligro" disabled={accion.ocupado !== null}
-                                onClick={() => setRechazando(p)}>
-                          Rechazar
-                        </button>
-                      </>
-                    ) : (
-                      <button type="button" className="boton" disabled={accion.ocupado !== null}
-                              onClick={() => accion.ejecutar(p.id, () => api.devolverPrestamo(p.id),
-                                `Registraste la devolución del préstamo #${p.id}.`)}>
-                        Registrar devolución
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      )}
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
             </tbody>
           </table>
         </div>
       )}
-      {rechazando && (
-        <DialogoRechazo prestamo={rechazando} alCerrar={() => setRechazando(null)}
-                        alRechazar={async (motivo) => {
-                          const ok = await accion.ejecutar(rechazando.id,
-                            () => api.rechazarPrestamo(rechazando.id, motivo),
-                            `Rechazaste el préstamo #${rechazando.id}.`);
-                          setRechazando(null);
-                          return ok;
-                        }} />
-      )}
+      <AnimatePresence>
+        {rechazo.dato && (
+          <DialogoRechazo key={rechazo.clave} prestamo={rechazo.dato} alCerrar={rechazo.cerrar}
+                          alRechazar={async (motivo) => {
+                            const p = rechazo.dato;
+                            rechazo.cerrar();
+                            await accion.ejecutar(p.id, () => api.rechazarPrestamo(p.id, motivo),
+                              `Rechazaste el préstamo #${p.id}.`);
+                          }} />
+        )}
+      </AnimatePresence>
     </>
   );
 }
 
 function DialogoRechazo({ prestamo, alCerrar, alRechazar }) {
   const [motivo, setMotivo] = useState('');
-  const [enviando, setEnviando] = useState(false);
   return (
     <Dialogo titulo={`Rechazar préstamo #${prestamo.id}`} alCerrar={alCerrar}>
-      <form className="formulario" onSubmit={async (e) => {
+      <form className="formulario" onSubmit={(e) => {
         e.preventDefault();
-        setEnviando(true);
-        await alRechazar(motivo);
+        alRechazar(motivo);
       }}>
         <p className="tenue">{prestamo.nombreUsuario} pidió {prestamo.nombreEquipo}. El motivo se le envía por correo.</p>
-        <label>
-          Motivo del rechazo
-          <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={500} rows={3} required
-                    autoFocus />
-        </label>
+        <div className="campo">
+          <label htmlFor="motivo-rechazo">Motivo del rechazo</label>
+          <textarea id="motivo-rechazo" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={500}
+                    rows={3} required autoFocus aria-describedby="ayuda-motivo" />
+          <small id="ayuda-motivo" className="ayuda ayuda-tenue">{motivo.length}/500</small>
+        </div>
         <div className="botones">
           <button type="button" className="boton boton-secundario" onClick={alCerrar}>Cancelar</button>
-          <button type="submit" className="boton boton-peligro" disabled={enviando || !motivo.trim()}>
+          <button type="submit" className="boton boton-peligro" disabled={!motivo.trim()}>
             Rechazar
           </button>
         </div>
@@ -201,15 +245,19 @@ function DialogoRechazo({ prestamo, alCerrar, alRechazar }) {
 export function Equipos() {
   const { datos: equipos, error, cargando, recargar } = useCarga(api.listarEquipos);
   const accion = useAccion(recargar);
-  const [editando, setEditando] = useState(null);
-  const [desactivando, setDesactivando] = useState(null);
+  const { avisar } = useAvisos();
+  const edicion = useDialogo();
+  const desactivacion = useDialogo();
+
+  const cambiarEstado = (eq, nuevo, texto) => accion.ejecutar(eq.id,
+    () => api.cambiarEstadoEquipo(eq.id, nuevo), texto,
+    () => api.cambiarEstadoEquipo(eq.id, eq.estado));
 
   return (
     <>
       <Encabezado titulo="Equipos" descripcion="Equipos activos del laboratorio.">
-        <button type="button" className="boton" onClick={() => setEditando({})}>Nuevo equipo</button>
+        <button type="button" className="boton" onClick={() => edicion.abrir({})}>Nuevo equipo</button>
       </Encabezado>
-      {accion.mensaje && <Alerta tipo="exito">{accion.mensaje}</Alerta>}
       <Alerta error={accion.error || error} />
       {cargando && !equipos ? (
         <Cargando />
@@ -228,70 +276,79 @@ export function Equipos() {
               </tr>
             </thead>
             <tbody>
-              {equipos?.map((eq) => (
-                <tr key={eq.id}>
-                  <td><span className="codigo">{eq.codigo}</span></td>
-                  <td>{eq.nombre}{eq.descripcion && <><br /><small className="tenue">{eq.descripcion}</small></>}</td>
-                  <td>{CATEGORIAS[eq.categoria]}</td>
-                  <td><EstadoEquipo estado={eq.estado} /></td>
-                  <td className="celda-acciones">
-                    <button type="button" className="boton boton-secundario" onClick={() => setEditando(eq)}>
-                      Editar
-                    </button>
-                    {eq.estado === 'DISPONIBLE' && (
-                      <button type="button" className="boton boton-secundario" disabled={accion.ocupado !== null}
-                              onClick={() => accion.ejecutar(eq.id, () => api.cambiarEstadoEquipo(eq.id, 'EN_MANTENIMIENTO'),
-                                `${eq.codigo} pasó a mantenimiento.`)}>
-                        A mantenimiento
+              <AnimatePresence initial={false}>
+                {equipos?.map((eq) => (
+                  <motion.tr key={eq.id} {...filaAnimada}>
+                    <td data-etiqueta="Código"><span className="codigo">{eq.codigo}</span></td>
+                    <td data-etiqueta="Nombre">
+                      <span>{eq.nombre}{eq.descripcion && <><br /><small className="tenue">{eq.descripcion}</small></>}</span>
+                    </td>
+                    <td data-etiqueta="Categoría">{CATEGORIAS[eq.categoria]}</td>
+                    <td data-etiqueta="Estado"><EstadoEquipo estado={eq.estado} /></td>
+                    <td className="celda-acciones">
+                      <button type="button" className="boton boton-secundario" onClick={() => edicion.abrir(eq)}>
+                        Editar
                       </button>
-                    )}
-                    {eq.estado === 'EN_MANTENIMIENTO' && (
-                      <button type="button" className="boton boton-secundario" disabled={accion.ocupado !== null}
-                              onClick={() => accion.ejecutar(eq.id, () => api.cambiarEstadoEquipo(eq.id, 'DISPONIBLE'),
-                                `${eq.codigo} volvió a estar disponible.`)}>
-                        Marcar disponible
-                      </button>
-                    )}
-                    {eq.estado !== 'PRESTADO' && (
-                      <button type="button" className="boton boton-peligro" disabled={accion.ocupado !== null}
-                              onClick={() => setDesactivando(eq)}>
-                        Desactivar
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      {eq.estado === 'DISPONIBLE' && (
+                        <button type="button" className="boton boton-secundario" disabled={accion.ocupado !== null}
+                                onClick={() => cambiarEstado(eq, 'EN_MANTENIMIENTO', `${eq.codigo} pasó a mantenimiento.`)}>
+                          A mantenimiento
+                        </button>
+                      )}
+                      {eq.estado === 'EN_MANTENIMIENTO' && (
+                        <button type="button" className="boton boton-secundario" disabled={accion.ocupado !== null}
+                                onClick={() => cambiarEstado(eq, 'DISPONIBLE', `${eq.codigo} volvió a estar disponible.`)}>
+                          Marcar disponible
+                        </button>
+                      )}
+                      {eq.estado !== 'PRESTADO' && (
+                        <button type="button" className="boton boton-peligro" disabled={accion.ocupado !== null}
+                                onClick={() => desactivacion.abrir(eq)}>
+                          Desactivar
+                        </button>
+                      )}
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
             </tbody>
           </table>
         </div>
       )}
-      {editando && (
-        <DialogoEquipo equipo={editando} alCerrar={() => setEditando(null)}
-                       alGuardar={async () => {
-                         setEditando(null);
-                         await recargar();
-                       }} />
-      )}
-      {desactivando && (
-        <Dialogo titulo={`Desactivar ${desactivando.codigo}`} alCerrar={() => setDesactivando(null)}>
-          <p>
-            {desactivando.nombre} dejará de aparecer en el catálogo. Su historial de préstamos se conserva y la acción
-            no se puede deshacer desde la aplicación.
-          </p>
-          <div className="botones">
-            <button type="button" className="boton boton-secundario" onClick={() => setDesactivando(null)}>
-              Cancelar
-            </button>
-            <button type="button" className="boton boton-peligro" onClick={async () => {
-              const eq = desactivando;
-              setDesactivando(null);
-              await accion.ejecutar(eq.id, () => api.desactivarEquipo(eq.id), `${eq.codigo} quedó desactivado.`);
-            }}>
-              Desactivar
-            </button>
-          </div>
-        </Dialogo>
-      )}
+      <AnimatePresence>
+        {edicion.dato && (
+          <DialogoEquipo key={edicion.clave} equipo={edicion.dato} alCerrar={edicion.cerrar}
+                         alGuardar={async (guardado, nuevo) => {
+                           edicion.cerrar();
+                           avisar(nuevo ? `Creaste el equipo ${guardado.codigo}.` : `Guardaste ${guardado.codigo}.`);
+                           await recargar();
+                         }} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {desactivacion.dato && (
+          // Desactivar no se puede deshacer desde la aplicación: es el único caso que pide confirmación.
+          <Dialogo key={desactivacion.clave} titulo={`Desactivar ${desactivacion.dato.codigo}`}
+                   alCerrar={desactivacion.cerrar}>
+            <p>
+              {desactivacion.dato.nombre} dejará de aparecer en el catálogo. Su historial de préstamos se conserva y
+              la acción no se puede deshacer desde la aplicación.
+            </p>
+            <div className="botones">
+              <button type="button" className="boton boton-secundario" onClick={desactivacion.cerrar}>
+                Cancelar
+              </button>
+              <button type="button" className="boton boton-peligro" onClick={async () => {
+                const eq = desactivacion.dato;
+                desactivacion.cerrar();
+                await accion.ejecutar(eq.id, () => api.desactivarEquipo(eq.id), `${eq.codigo} quedó desactivado.`);
+              }}>
+                Desactivar
+              </button>
+            </div>
+          </Dialogo>
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -313,12 +370,8 @@ function DialogoEquipo({ equipo, alCerrar, alGuardar }) {
     setEnviando(true);
     setError(null);
     try {
-      if (nuevo) {
-        await api.crearEquipo(datos);
-      } else {
-        await api.actualizarEquipo(equipo.id, datos);
-      }
-      await alGuardar();
+      const guardado = nuevo ? await api.crearEquipo(datos) : await api.actualizarEquipo(equipo.id, datos);
+      await alGuardar(guardado, nuevo);
     } catch (e) {
       setError(e);
       setEnviando(false);
@@ -365,7 +418,7 @@ function DialogoEquipo({ equipo, alCerrar, alGuardar }) {
   );
 }
 
-/** RF12: activar y desactivar cuentas de estudiantes. */
+/** RF12: activar y desactivar cuentas de estudiantes. Es reversible, así que se ofrece Deshacer. */
 export function Estudiantes() {
   const { datos: estudiantes, error, cargando, recargar } = useCarga(api.listarEstudiantes);
   const accion = useAccion(recargar);
@@ -373,7 +426,6 @@ export function Estudiantes() {
     <>
       <Encabezado titulo="Estudiantes"
                   descripcion="Una cuenta desactivada no puede iniciar sesión ni pedir préstamos." />
-      {accion.mensaje && <Alerta tipo="exito">{accion.mensaje}</Alerta>}
       <Alerta error={accion.error || error} />
       {cargando && !estudiantes ? (
         <Cargando />
@@ -393,9 +445,9 @@ export function Estudiantes() {
             <tbody>
               {estudiantes?.map((u) => (
                 <tr key={u.id}>
-                  <td>{u.nombre}</td>
-                  <td>{u.correo}</td>
-                  <td>
+                  <td data-etiqueta="Nombre">{u.nombre}</td>
+                  <td data-etiqueta="Correo">{u.correo}</td>
+                  <td data-etiqueta="Estado">
                     <span className={`insignia ${u.activo ? 'insignia-disponible' : 'insignia-inactivo'}`}>
                       {u.activo ? 'Activa' : 'Desactivada'}
                     </span>
@@ -404,13 +456,13 @@ export function Estudiantes() {
                     {u.activo ? (
                       <button type="button" className="boton boton-peligro" disabled={accion.ocupado !== null}
                               onClick={() => accion.ejecutar(u.id, () => api.desactivarUsuario(u.id),
-                                `Desactivaste la cuenta de ${u.nombre}.`)}>
+                                `Desactivaste la cuenta de ${u.nombre}.`, () => api.activarUsuario(u.id))}>
                         Desactivar
                       </button>
                     ) : (
                       <button type="button" className="boton" disabled={accion.ocupado !== null}
                               onClick={() => accion.ejecutar(u.id, () => api.activarUsuario(u.id),
-                                `Reactivaste la cuenta de ${u.nombre}.`)}>
+                                `Reactivaste la cuenta de ${u.nombre}.`, () => api.desactivarUsuario(u.id))}>
                         Activar
                       </button>
                     )}

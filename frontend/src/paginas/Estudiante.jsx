@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { api } from '../api/cliente.js';
 import {
-  Alerta, Cargando, Dialogo, Encabezado, EstadoEquipo, EstadoPrestamo, Vacio,
+  Alerta, Cargando, Dialogo, Encabezado, EstadoEquipo, EstadoPrestamo, Vacio, useAvisos, useDialogo,
 } from '../componentes/Comunes.jsx';
 import { CATEGORIAS, formatearFecha, formatearFechaHora, hoyEnBogota, sumarDias } from '../util/formato.js';
+import { RESORTE } from '../util/movimiento.js';
 import { useCarga } from '../util/useCarga.js';
 
 const DIAS_MAXIMOS = 7;
@@ -18,8 +20,9 @@ export function Catalogo() {
     [categoria, soloDisponibles],
   );
   const { datos: equipos, error, cargando, recargar } = useCarga(consulta);
-  const [elegido, setElegido] = useState(null);
-  const [exito, setExito] = useState(null);
+  const solicitud = useDialogo();
+  const { avisar } = useAvisos();
+  const navegar = useNavigate();
 
   return (
     <>
@@ -40,43 +43,48 @@ export function Catalogo() {
           Solo disponibles
         </label>
       </div>
-      {exito && (
-        <Alerta tipo="exito">
-          {exito} <Link to="/mis-prestamos">Ver mis préstamos</Link>
-        </Alerta>
-      )}
       <Alerta error={error} />
       {cargando && !equipos ? (
         <Cargando />
       ) : equipos?.length === 0 ? (
         <Vacio>No hay equipos que coincidan con el filtro.</Vacio>
       ) : (
-        <div className="rejilla">
-          {equipos?.map((equipo) => (
-            <article key={equipo.id} className="tarjeta equipo">
-              <div className="equipo-cabeza">
-                <span className="codigo">{equipo.codigo}</span>
-                <EstadoEquipo estado={equipo.estado} />
-              </div>
-              <h2>{equipo.nombre}</h2>
-              <p className="tenue">{CATEGORIAS[equipo.categoria]}</p>
-              {equipo.descripcion && <p>{equipo.descripcion}</p>}
-              <button type="button" className="boton" disabled={equipo.estado !== 'DISPONIBLE'}
-                      onClick={() => { setExito(null); setElegido(equipo); }}>
-                Solicitar préstamo
-              </button>
-            </article>
-          ))}
-        </div>
+        // Al filtrar, las tarjetas que quedan se deslizan a su nuevo lugar y las demás se desvanecen en el suyo.
+        <motion.div layout className="rejilla">
+          <AnimatePresence initial={false} mode="popLayout">
+            {equipos?.map((equipo) => (
+              <motion.article key={equipo.id} layout className="tarjeta equipo" transition={RESORTE}
+                              initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.96 }}>
+                <div className="equipo-cabeza">
+                  <span className="codigo">{equipo.codigo}</span>
+                  <EstadoEquipo estado={equipo.estado} />
+                </div>
+                <h2>{equipo.nombre}</h2>
+                <p className="tenue">{CATEGORIAS[equipo.categoria]}</p>
+                {equipo.descripcion && <p>{equipo.descripcion}</p>}
+                <button type="button" className="boton" disabled={equipo.estado !== 'DISPONIBLE'}
+                        onClick={() => solicitud.abrir(equipo)}>
+                  Solicitar préstamo
+                </button>
+              </motion.article>
+            ))}
+          </AnimatePresence>
+        </motion.div>
       )}
-      {elegido && (
-        <DialogoSolicitud equipo={elegido} alCerrar={() => setElegido(null)}
-                          alSolicitar={(prestamo) => {
-                            setElegido(null);
-                            setExito(`Solicitaste ${prestamo.nombreEquipo}. Quedó PENDIENTE de aprobación.`);
-                            recargar();
-                          }} />
-      )}
+      <AnimatePresence>
+        {solicitud.dato && (
+          <DialogoSolicitud key={solicitud.clave} equipo={solicitud.dato} alCerrar={solicitud.cerrar}
+                            alSolicitar={(prestamo) => {
+                              solicitud.cerrar();
+                              avisar({
+                                texto: `Solicitaste ${prestamo.nombreEquipo}. Quedó PENDIENTE de aprobación.`,
+                                accion: { texto: 'Ver mis préstamos', alHacer: () => navegar('/mis-prestamos') },
+                              });
+                              recargar();
+                            }} />
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -87,6 +95,7 @@ function DialogoSolicitud({ equipo, alCerrar, alSolicitar }) {
   const [fecha, setFecha] = useState(sumarDias(hoy, 3));
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const fueraDeRango = fecha < hoy || fecha > limite;
 
   async function enviar(evento) {
     evento.preventDefault();
@@ -104,15 +113,18 @@ function DialogoSolicitud({ equipo, alCerrar, alSolicitar }) {
     <Dialogo titulo={`Solicitar ${equipo.nombre}`} alCerrar={alCerrar}>
       <form onSubmit={enviar} className="formulario">
         <Alerta error={error} />
-        <label>
-          Fecha de devolución
-          <input type="date" value={fecha} min={hoy} max={limite} onChange={(e) => setFecha(e.target.value)}
-                 required />
-          <small className="tenue">Entre hoy y el {formatearFecha(limite)} (máximo 7 días).</small>
-        </label>
+        <div className="campo">
+          <label htmlFor="fecha-devolucion">Fecha de devolución</label>
+          <input id="fecha-devolucion" type="date" value={fecha} min={hoy} max={limite}
+                 onChange={(e) => setFecha(e.target.value)} required aria-invalid={fueraDeRango}
+                 aria-describedby="ayuda-fecha" />
+          <small id="ayuda-fecha" className={`ayuda ${fueraDeRango ? 'ayuda-invalido' : 'ayuda-tenue'}`}>
+            Entre hoy y el {formatearFecha(limite)} (máximo 7 días).
+          </small>
+        </div>
         <div className="botones">
           <button type="button" className="boton boton-secundario" onClick={alCerrar}>Cancelar</button>
-          <button type="submit" className="boton" disabled={enviando}>
+          <button type="submit" className="boton" disabled={enviando || fueraDeRango}>
             {enviando ? 'Enviando…' : 'Confirmar solicitud'}
           </button>
         </div>
@@ -157,12 +169,12 @@ export function MisPrestamos() {
             <tbody>
               {prestamos?.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.id}</td>
-                  <td><span className="codigo">{p.codigoEquipo}</span> {p.nombreEquipo}</td>
-                  <td>{formatearFecha(p.fechaSolicitud)}</td>
-                  <td>{formatearFecha(p.fechaDevolucionEsperada)}</td>
-                  <td><EstadoPrestamo estado={p.estado} /></td>
-                  <td className="tenue">{detallePrestamo(p)}</td>
+                  <td className="numero" data-etiqueta="Préstamo">{p.id}</td>
+                  <td data-etiqueta="Equipo"><span className="codigo">{p.codigoEquipo}</span> {p.nombreEquipo}</td>
+                  <td data-etiqueta="Solicitado">{formatearFecha(p.fechaSolicitud)}</td>
+                  <td data-etiqueta="Devolver el">{formatearFecha(p.fechaDevolucionEsperada)}</td>
+                  <td data-etiqueta="Estado"><EstadoPrestamo estado={p.estado} /></td>
+                  <td className="tenue" data-etiqueta="Detalle">{detallePrestamo(p)}</td>
                 </tr>
               ))}
             </tbody>

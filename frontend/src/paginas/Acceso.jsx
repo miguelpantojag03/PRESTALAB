@@ -1,14 +1,32 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { useAnimate } from 'motion/react';
 import { api } from '../api/cliente.js';
 import { useSesion } from '../auth/Sesion.jsx';
 import { Alerta } from '../componentes/Comunes.jsx';
 import { inicioSegunRol } from '../componentes/Plantilla.jsx';
 
-function MarcoAcceso({ titulo, children }) {
+const MAXIMO_BYTES_PASSWORD = 72;
+
+/**
+ * Sacudida horizontal, como el inicio de sesión de macOS: la causa (credenciales rechazadas) es evidente y el
+ * movimiento dice "no" sin palabras. No se hace con "reducir movimiento" activado; el mensaje basta.
+ */
+function useSacudida() {
+  const [alcance, animar] = useAnimate();
+  const sacudir = () => {
+    const reducir = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (!reducir && alcance.current) {
+      animar(alcance.current, { x: [0, -10, 9, -6, 4, -2, 0] }, { duration: 0.45, ease: 'easeOut' });
+    }
+  };
+  return [alcance, sacudir];
+}
+
+function MarcoAcceso({ titulo, alcance, children }) {
   return (
     <div className="acceso">
-      <div className="acceso-tarjeta">
+      <div className="acceso-tarjeta" ref={alcance}>
         <div className="acceso-marca">
           <span className="logo" aria-hidden="true">PL</span>
           <div>
@@ -31,6 +49,7 @@ export function IniciarSesion() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const [alcance, sacudir] = useSacudida();
 
   if (sesion) {
     return <Navigate to={inicioSegunRol(sesion.rol)} replace />;
@@ -46,11 +65,14 @@ export function IniciarSesion() {
     } catch (e) {
       setError(e);
       setEnviando(false);
+      if (e.codigo === 'CREDENCIALES_INVALIDAS') {
+        sacudir();
+      }
     }
   }
 
   return (
-    <MarcoAcceso titulo="Iniciar sesión">
+    <MarcoAcceso titulo="Iniciar sesión" alcance={alcance}>
       {motivoCierre && !error && <Alerta tipo="info">{motivoCierre}</Alerta>}
       <Alerta error={error} />
       <form onSubmit={enviar} className="formulario">
@@ -89,6 +111,17 @@ export function Registro() {
 
   const cambiar = (campo) => (e) => setDatos({ ...datos, [campo]: e.target.value });
 
+  // Validación en línea mientras se escribe, no al enviar. Los 72 bytes son el límite real de BCrypt en el backend.
+  const largo = datos.password.length;
+  const bytes = new TextEncoder().encode(datos.password).length;
+  const avisoPassword = largo === 0
+    ? { tipo: 'tenue', texto: 'Mínimo 8 caracteres.' }
+    : largo < 8
+      ? { tipo: 'tenue', texto: `Faltan ${8 - largo} caracter${8 - largo === 1 ? '' : 'es'}.` }
+      : bytes > MAXIMO_BYTES_PASSWORD
+        ? { tipo: 'invalido', texto: 'Demasiado larga: con tildes, ñ o emojis caben menos de 72 caracteres.' }
+        : { tipo: 'valido', texto: 'Contraseña válida.' };
+
   async function enviar(evento) {
     evento.preventDefault();
     setEnviando(true);
@@ -117,13 +150,17 @@ export function Registro() {
           <input type="email" value={datos.correo} onChange={cambiar('correo')} maxLength={150}
                  autoComplete="email" required />
         </label>
-        <label>
-          Contraseña
-          <input type="password" value={datos.password} onChange={cambiar('password')} minLength={8} maxLength={72}
-                 autoComplete="new-password" required />
-          <small className="tenue">Entre 8 y 72 caracteres.</small>
-        </label>
-        <button type="submit" className="boton" disabled={enviando}>
+        {/* La ayuda va fuera del label: así el nombre accesible del campo es solo "Contraseña". */}
+        <div className="campo">
+          <label htmlFor="registro-password">Contraseña</label>
+          <input id="registro-password" type="password" value={datos.password} onChange={cambiar('password')}
+                 minLength={8} maxLength={72} autoComplete="new-password" required aria-describedby="ayuda-password"
+                 aria-invalid={avisoPassword.tipo === 'invalido'} />
+          <small id="ayuda-password" className={`ayuda ayuda-${avisoPassword.tipo}`} aria-live="polite">
+            {avisoPassword.texto}
+          </small>
+        </div>
+        <button type="submit" className="boton" disabled={enviando || avisoPassword.tipo === 'invalido'}>
           {enviando ? 'Creando cuenta…' : 'Crear cuenta'}
         </button>
       </form>
