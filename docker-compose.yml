@@ -1,0 +1,58 @@
+# Despliegue de PrestaLab (D8): tres contenedores en la red prestalab-net y el volumen pgdata.
+# Las credenciales de la base de datos y el secreto JWT se leen de .env (ver .env.example); nunca se versionan.
+services:
+  prestalab-app:
+    build: .
+    container_name: prestalab-app
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://prestalab-db:5432/prestalab
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      SPRING_MAIL_HOST: prestalab-mail
+      SPRING_MAIL_PORT: 1025
+      PRESTALAB_JWT_SECRET: ${PRESTALAB_JWT_SECRET:?Define PRESTALAB_JWT_SECRET en .env}
+    depends_on:
+      prestalab-db:
+        condition: service_healthy
+      prestalab-mail:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - prestalab-net
+
+  prestalab-db:
+    image: postgres:16
+    container_name: prestalab-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: prestalab
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d prestalab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - prestalab-net
+
+  prestalab-mail:
+    image: axllent/mailpit
+    container_name: prestalab-mail
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - prestalab-net
+
+networks:
+  prestalab-net:
+    driver: bridge
+
+volumes:
+  pgdata:
