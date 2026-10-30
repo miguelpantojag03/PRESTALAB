@@ -1,6 +1,6 @@
 # PrestaLab
 
-[![CI](https://github.com/miguelpantojag03/prestalab/actions/workflows/ci.yml/badge.svg)](https://github.com/miguelpantojag03/prestalab/actions/workflows/ci.yml)
+[![CI](https://github.com/miguelpantojag03/PRESTALAB/actions/workflows/ci.yml/badge.svg)](https://github.com/miguelpantojag03/PRESTALAB/actions/workflows/ci.yml)
 
 API REST de préstamo de equipos del laboratorio universitario. JSON sobre HTTP, autenticación stateless con JWT
 y documentación con Swagger UI. No tiene interfaz web propia: se usa desde Swagger UI, Postman o cualquier cliente HTTP.
