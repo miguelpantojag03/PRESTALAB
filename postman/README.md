@@ -18,6 +18,24 @@ docker compose up -d --build
 
 La corrida necesita los tres contenedores de D8. La carpeta 09 consulta Mailpit en `http://localhost:8025`.
 
+### Sin Docker (Windows)
+
+También se puede correr con PostgreSQL 16 y Mailpit instalados en la máquina:
+
+```bash
+winget install --id axllent.mailpit -e     # una sola vez
+mailpit --smtp 0.0.0.0:1025 --listen 0.0.0.0:8025
+```
+
+En otra consola, con PostgreSQL corriendo y una base `prestalab` creada:
+
+```bash
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/prestalab \
+SPRING_DATASOURCE_USERNAME=prestalab SPRING_DATASOURCE_PASSWORD=tu-clave \
+PRESTALAB_JWT_SECRET="$(openssl rand -base64 48)" \
+java -jar target/prestalab.jar
+```
+
 ## Ejecutar en Postman (Collection Runner)
 
 1. En Postman, usa **Import** y elige los dos archivos JSON de esta carpeta.
