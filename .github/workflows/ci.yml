@@ -1,0 +1,106 @@
+# CI de PrestaLab (D7).
+#  - verify: todas las pruebas JUnit (incluidas las de Testcontainers, que usan el Docker del runner)
+#    y la regla de cobertura de JaCoCo.
+#  - e2e-postman: levanta los tres contenedores de D8 y ejecuta la colección de Postman con Newman.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21 (Temurin) con caché de Maven
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Compilar, probar y verificar cobertura
+        run: mvn -B verify
+
+      - name: Publicar el reporte de JaCoCo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-jacoco
+          path: target/site/jacoco
+          if-no-files-found: warn
+
+  e2e-postman:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21 (Temurin) con caché de Maven
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Empaquetar prestalab.jar (las pruebas ya corrieron en verify)
+        run: mvn -B package -DskipTests
+
+      - name: Crear .env con un secreto JWT generado en el job
+        run: |
+          cp .env.example .env
+          sed -i '/^PRESTALAB_JWT_SECRET=/d' .env
+          echo "PRESTALAB_JWT_SECRET=$(openssl rand -base64 48)" >> .env
+
+      - name: Levantar prestalab-app, prestalab-db y prestalab-mail
+        run: docker compose up -d --build
+
+      - name: Esperar a que la API responda (máximo 120 s)
+        run: |
+          for i in $(seq 1 60); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/v3/api-docs)" = "200" ]; then
+              echo "API lista tras $((i * 2)) s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "La API no respondió en 120 s"
+          exit 1
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar Newman
+        run: npm install --global newman@6
+
+      - name: Ejecutar la colección de Postman
+        run: |
+          mkdir -p target/newman
+          newman run postman/PrestaLab-API.postman_collection.json \
+            -e postman/PrestaLab-API.local.postman_environment.json \
+            --reporters cli,junit --reporter-junit-export target/newman/resultado.xml
+
+      - name: Publicar el reporte JUnit de Newman
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-newman
+          path: target/newman/resultado.xml
+          if-no-files-found: warn
+
+      - name: Mostrar los logs de los contenedores si algo falló
+        if: failure()
+        run: docker compose logs
+
+      - name: Apagar y borrar los contenedores y el volumen
+        if: always()
+        run: docker compose down -v
