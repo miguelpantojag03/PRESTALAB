@@ -162,6 +162,39 @@ describe('flujos de la interfaz', () => {
     expect(screen.getByRole('button', { name: 'Crear cuenta' }).disabled).toBe(true);
   });
 
+  it('si la cuenta se creó pero falló el inicio de sesión, el reintento no la vuelve a registrar', async () => {
+    let registros = 0;
+    let intentosLogin = 0;
+    simularApi({
+      'POST /api/v1/auth/registro': () => {
+        registros += 1;
+        return registros === 1
+          ? [201, { id: 7, nombre: 'Laura Gómez', correo: 'laura@uni.edu.co', rol: 'ESTUDIANTE', activo: true }]
+          : [422, { codigo: 'REGLA_NEGOCIO', detail: 'Ya existe una cuenta con ese correo' }];
+      },
+      'POST /api/v1/auth/login': () => {
+        intentosLogin += 1;
+        return intentosLogin === 1
+          ? [500, { codigo: 'ERROR_INTERNO', detail: 'Ocurrió un error interno; inténtalo de nuevo más tarde' }]
+          : [200, { token: TOKEN_ESTUDIANTE, tipo: 'Bearer', expiraEnSegundos: 3600, rol: 'ESTUDIANTE' }];
+      },
+      'GET /api/v1/equipos': [200, [EQUIPO]],
+      'GET /api/v1/prestamos/mios': [200, []],
+    });
+    montar('/registro');
+
+    await userEvent.type(await screen.findByLabelText('Nombre completo'), 'Laura Gómez');
+    await userEvent.type(screen.getByLabelText('Correo institucional'), 'laura@uni.edu.co');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'Secreta123');
+    await userEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Ocurrió un error interno');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+
+    expect(await screen.findByRole('heading', { name: 'Catálogo' })).toBeTruthy();
+    expect(registros).toBe(1);
+  });
+
   it('desactivar a un estudiante se confirma con un aviso que permite deshacerlo', async () => {
     sessionStorage.setItem('prestalab.token', TOKEN_ADMIN);
     let activo = true;

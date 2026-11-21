@@ -1,5 +1,7 @@
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ErrorApi, api, configurarCliente } from '../api/cliente.js';
+import { useCarga } from '../util/useCarga.js';
 import { leerPayload, sesionDesdeToken } from '../auth/token.js';
 import { formatearFecha, formatearFechaHora, hoyEnBogota, sumarDias } from '../util/formato.js';
 import { tokenDePrueba } from './ayudas.js';
@@ -119,5 +121,27 @@ describe('cliente de la API', () => {
     const error = await api.resumen().catch((e) => e);
     expect(error.codigo).toBe('SIN_CONEXION');
     expect(error.message).toBe('No hay conexión con el servidor');
+  });
+});
+
+describe('useCarga', () => {
+  it('una respuesta vieja que llega tarde no pisa los datos de una recarga más nueva', async () => {
+    // Cada llamada queda pendiente hasta que la prueba la resuelve a mano.
+    const pendientes = [];
+    const consulta = () => new Promise((resolver) => pendientes.push(resolver));
+    const { result } = renderHook(() => useCarga(consulta));
+
+    // La carga inicial y una recarga (por ejemplo, la de Deshacer) quedan en vuelo a la vez.
+    act(() => {
+      result.current.recargar();
+    });
+    const vieja = pendientes[0];
+    const nueva = pendientes[pendientes.length - 1];
+
+    await act(async () => nueva('datos nuevos'));
+    await act(async () => vieja('datos viejos'));
+
+    expect(result.current.datos).toBe('datos nuevos');
+    expect(result.current.cargando).toBe(false);
   });
 });
