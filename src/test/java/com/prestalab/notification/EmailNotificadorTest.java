@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -175,5 +176,20 @@ class EmailNotificadorTest {
 
         assertThatCode(() -> notificador.notificarCambioEstado(prestamo)).doesNotThrowAnyException();
         assertThatCode(() -> notificador.notificarRecordatorio(prestamo)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void unFalloDeLaPlantillaNoSePropaga() {
+        // Sin plantillas en el classpath, Thymeleaf lanza una excepción de runtime al procesarlas.
+        ClassLoaderTemplateResolver sinPlantillas = new ClassLoaderTemplateResolver();
+        sinPlantillas.setPrefix("no-existe/");
+        sinPlantillas.setSuffix(".html");
+        SpringTemplateEngine motorRoto = new SpringTemplateEngine();
+        motorRoto.setTemplateResolver(sinPlantillas);
+        EmailNotificador conPlantillaRota = new EmailNotificador(mailSender, motorRoto, "no-reply@prestalab.local");
+
+        assertThatCode(() -> conPlantillaRota.notificarCambioEstado(prestamo)).doesNotThrowAnyException();
+        assertThatCode(() -> conPlantillaRota.notificarRecordatorio(prestamo)).doesNotThrowAnyException();
+        verify(mailSender, never()).send(any(MimeMessage.class));
     }
 }

@@ -14,6 +14,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 import org.thymeleaf.context.Context;
+import org.thymeleaf.exceptions.TemplateEngineException;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import java.nio.charset.StandardCharsets;
@@ -23,7 +24,7 @@ import java.util.Locale;
 /**
  * Adaptador SMTP del puerto {@link Notificador}. Envía cada correo en HTML (plantillas Thymeleaf
  * de templates/correo) con una versión de texto plano como alternativa. Un fallo del servidor
- * de correo se registra y nunca revierte el cambio de estado del préstamo.
+ * de correo, o al procesar la plantilla, se registra y nunca revierte el cambio de estado del préstamo.
  */
 @Component
 public class EmailNotificador implements Notificador {
@@ -69,7 +70,7 @@ public class EmailNotificador implements Notificador {
             ayudante.setSubject(asunto);
             ayudante.setText(textoPlano, templateEngine.process(plantilla, contexto(prestamo)));
             mailSender.send(mensaje);
-        } catch (MailException | MessagingException e) {
+        } catch (MailException | MessagingException | TemplateEngineException e) {
             log.warn("No se pudo enviar el correo del préstamo {} ({})",
                     prestamo.getId(), e.getClass().getSimpleName());
         }
