@@ -6,6 +6,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -36,5 +38,19 @@ class DatosInicialesTest {
         assertThat(sql).contains("'PORTATIL'", "'CAMARA'", "'PROYECTOR'", "'KIT_ELECTRONICO'", "'OTRO'");
         assertThat(sql).contains("'DISPONIBLE'", "'EN_MANTENIMIENTO'");
         assertThat(Pattern.compile("\\('[A-Z]+-\\d{3}'").matcher(sql).results().count()).isGreaterThanOrEqualTo(8);
+    }
+
+    /**
+     * Un secreto JWT de ejemplo con 32 bytes o más pasaría la validación de SecurityConfig: quien copie
+     * .env.example sin cambiarlo levantaría la API con un secreto público y cualquiera podría firmar un token de
+     * ADMIN. Vacío, docker compose se niega a arrancar ("Define PRESTALAB_JWT_SECRET en .env").
+     */
+    @Test
+    void elEnvDeEjemploNoTraeUnSecretoJwtUsable() throws IOException {
+        String ejemplo = Files.readString(Path.of(".env.example"), StandardCharsets.UTF_8);
+        Matcher secreto = Pattern.compile("(?m)^PRESTALAB_JWT_SECRET=(.*)$").matcher(ejemplo);
+
+        assertThat(secreto.find()).isTrue();
+        assertThat(secreto.group(1).trim()).isEmpty();
     }
 }
