@@ -77,7 +77,7 @@ const consulta = (parametros) => {
   return texto ? `?${texto}` : '';
 };
 
-/** Los 19 endpoints de la API, agrupados como en Swagger. */
+/** Los 19 endpoints de la API, agrupados por recurso como en la colección de Postman. */
 export const api = {
   registrar: (datos) => solicitar('POST', '/auth/registro', datos),
   iniciarSesion: (datos) => solicitar('POST', '/auth/login', datos),

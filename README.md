@@ -4,7 +4,9 @@
 
 Sistema de préstamo de equipos del laboratorio universitario. Tiene dos partes:
 
-- **Backend:** API REST con JSON sobre HTTP, autenticación stateless con JWT y documentación en Swagger UI.
+- **Backend:** API REST con JSON sobre HTTP, autenticación stateless con JWT y datos en MongoDB. No publica
+  Swagger ni OpenAPI: la API se documenta en este README y en la [colección de Postman](postman/README.md). Ver el
+  [ADR 0008](docs/adr/0008-mongodb-y-sin-swagger.md).
 - **Frontend:** aplicación web en React (carpeta [frontend/](frontend/README.md)) que consume esa API. Ver el
   [ADR 0007](docs/adr/0007-frontend-react-en-contenedor-propio.md).
 
@@ -15,9 +17,8 @@ Sistema de préstamo de equipos del laboratorio universitario. Tiene dos partes:
   - marca los préstamos vencidos a las 00:00;
   - a las 08:00 recuerda los préstamos que vencen al día siguiente.
 
-Java 21 · Spring Boot 3.5 · Spring Security 6 (OAuth2 Resource Server, JWT HS256) · Spring Data JPA ·
-springdoc-openapi · PostgreSQL 16 · Flyway · Docker Compose · Thymeleaf (solo para las plantillas de correo) ·
-React 18 · Vite · nginx.
+Java 21 · Spring Boot 3.5 · Spring Security 6 (OAuth2 Resource Server, JWT HS256) · Spring Data MongoDB ·
+MongoDB 7 · Docker Compose · Thymeleaf (solo para las plantillas de correo) · React 18 · Vite · nginx.
 
 ## Requisitos
 
@@ -44,8 +45,7 @@ Si `PRESTALAB_JWT_SECRET` falta o tiene menos de 32 bytes, la aplicación no arr
 |---|---|
 | **Aplicación web (frontend)** | **http://localhost:3000** |
 | API | http://localhost:8080/api/v1 |
-| Swagger UI | http://localhost:8080/swagger-ui.html |
-| Especificación OpenAPI | http://localhost:8080/v3/api-docs |
+| MongoDB (con Compass o mongosh) | mongodb://localhost:27017 (usuario y clave de `.env`, `authSource=admin`) |
 | Mailpit (correos enviados) | http://localhost:8025 |
 
 ## Obtener un token
@@ -59,10 +59,8 @@ curl -s -X POST http://localhost:8080/api/v1/auth/login \
 curl -s http://localhost:8080/api/v1/dashboard/resumen -H "Authorization: Bearer eyJ..."
 ```
 
-**En Swagger UI:**
-1. Ejecuta `POST /api/v1/auth/login` con "Try it out".
-2. Copia el `token` de la respuesta.
-3. Pulsa **Authorize**, pega el token (sin escribir `Bearer`) y confirma.
+**En Postman:** importa la colección y el entorno de `postman/`. La petición de login guarda el token y las demás lo
+envían solas en la cabecera `Authorization`.
 
 El token vence a los 60 minutos. No hay refresh tokens: al vencer, se inicia sesión otra vez.
 
@@ -75,9 +73,9 @@ El token vence a los 60 minutos. No hay refresh tokens: al vencer, se inicia ses
 Los estudiantes se registran con `POST /api/v1/auth/registro`, que siempre crea una cuenta de ESTUDIANTE.
 
 > **Advertencia:** estas credenciales solo sirven para desarrollo. Antes de ir a producción:
-> - cambia la contraseña del administrador (o reemplaza el hash de `V2__datos_iniciales.sql` por uno nuevo);
+> - cambia la contraseña del administrador (o reemplaza `HASH_ADMIN` en `service/DatosIniciales.java` por uno nuevo);
 > - usa contraseñas reales y un secreto JWT propio en `.env`, que nunca se versiona;
-> - apaga Swagger con `SPRINGDOC_API_DOCS_ENABLED=false`.
+> - no publiques el puerto 27017 de MongoDB fuera de la máquina.
 
 ## Endpoints
 
@@ -131,15 +129,14 @@ desactivada". Sus préstamos no cambian. Las cuentas de administrador no se pued
 |---|---|---|
 | `prestalab-web` | build de `frontend/Dockerfile` (Node 20 compila; `nginx-unprivileged` sirve y reenvía `/api`) | 3000:8080 |
 | `prestalab-app` | build del `Dockerfile` (`eclipse-temurin:21-jre`, usuario no root) | 8080:8080 |
-| `prestalab-db` | `postgres:16`, volumen `pgdata:/var/lib/postgresql/data` | 5432:5432 |
+| `prestalab-db` | `mongo:7.0`, volumen `mongodata:/data/db` | 27017:27017 |
 | `prestalab-mail` | `axllent/mailpit` | 1025:1025 (SMTP), 8025:8025 (web) |
 
 Son cuatro contenedores: el frontend amplía los tres originales de D8 (ver el ADR 0007). Todos están en la red
-`prestalab-net` (bridge). El navegador solo habla con `prestalab-web`, que reenvía `/api`, `/swagger-ui` y
-`/v3/api-docs` a `prestalab-app`. Así hay un solo origen y el backend no necesita CORS. Variables de entorno de
-`prestalab-app`:
-`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `SPRING_MAIL_HOST`,
-`SPRING_MAIL_PORT` y `PRESTALAB_JWT_SECRET`.
+`prestalab-net` (bridge). El navegador solo habla con `prestalab-web`, que reenvía `/api` a `prestalab-app`. Así hay
+un solo origen y el backend no necesita CORS. Variables de entorno de `prestalab-app`: `SPRING_DATA_MONGODB_URI`
+(armada con `MONGO_USER` y `MONGO_PASSWORD` de `.env`), `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT` y
+`PRESTALAB_JWT_SECRET`.
 
 ## Pruebas
 
@@ -150,9 +147,9 @@ Son cuatro contenedores: el frontend amplía los tres originales de D8 (ver el A
 | Notificación (correo HTML multipart) y tareas programadas | `EmailNotificadorTest`, `VencimientoSchedulerTest`, `RecordatorioSchedulerTest` | No |
 | Capa REST (19 endpoints, matriz de seguridad, ProblemDetail) | `ControladoresRestTest` | No |
 | Arquitectura (las 15 dependencias de D7, lista blanca de clases, solo `@RestController`) | `ArquitecturaTest`, `FidelidadDiccionarioTest` | No |
-| Hash BCrypt real del administrador | `DatosInicialesTest` | No |
-| Persistencia con PostgreSQL 16 | `RepositoriosIntegracionTest` | Sí |
-| API completa: flujo de D6, RF12 y OpenAPI | `ApiIntegracionTest` | Sí |
+| Datos iniciales (hash BCrypt real del administrador, equipos de ejemplo) y `.env.example` | `DatosInicialesTest` | No |
+| Persistencia con MongoDB 7: consultas, índices únicos (incluido el parcial), escrituras condicionales y candado | `RepositoriosIntegracionTest` | Sí |
+| API completa: flujo de D6, RF12, peticiones simultáneas y que Swagger ya no existe | `ApiIntegracionTest` | Sí |
 
 Las pruebas que necesitan Docker usan `@Testcontainers(disabledWithoutDocker = true)`: sin Docker aparecen como
 omitidas (*skipped*), no como fallidas. El reporte de cobertura queda en `target/site/jacoco/index.html`.
@@ -203,18 +200,22 @@ Esta sección resume los detalles de implementación.
   qué correos están registrados.
 - **Sin CSRF ni sesión:** la API es stateless y el token viaja en la cabecera `Authorization`, no en una cookie.
 - **Autorización en dos capas:** reglas por URL en `SecurityConfig` y `@PreAuthorize` en cada endpoint.
-- **Datos iniciales:** V2 siembra equipos DISPONIBLE y EN_MANTENIMIENTO, pero ninguno PRESTADO. Un equipo
-  PRESTADO sin préstamo asociado nunca podría volver a DISPONIBLE. Los scripts de Flyway no se editan.
-- **Peticiones simultáneas:** el servicio verifica las reglas antes de guardar, y PostgreSQL detiene a la segunda
-  de dos peticiones que pasaron esa verificación al mismo tiempo. Los cambios se guardan con `saveAndFlush`, así que
-  el error llega antes de enviar el correo.
-  - Dos aprobaciones del mismo equipo: el índice único parcial `ux_prestamos_equipo_en_curso` (V1). La segunda
-    responde 422.
-  - RN01 con solicitudes simultáneas: el trigger `tg_prestamos_rn01` (V3) toma un candado por usuario y vuelve a
-    contar. Las que sobran responden 422.
-  - Dos operaciones sobre el mismo préstamo (por ejemplo, aprobar y rechazar): el trigger `tg_prestamos_transicion`
-    (V3) solo admite las transiciones de D5. La segunda responde 409, así que el equipo nunca queda PRESTADO con
-    un préstamo rechazado.
+- **Datos iniciales:** `DatosIniciales` siembra al arrancar el administrador y 9 equipos DISPONIBLES y
+  EN_MANTENIMIENTO, pero ninguno PRESTADO: un equipo PRESTADO sin préstamo asociado nunca podría volver a
+  DISPONIBLE. Solo siembra lo que falta, así que reiniciar la aplicación no duplica nada.
+- **Ids numéricos:** MongoDB genera ids `ObjectId`, pero `GeneradorIds` asigna a cada documento nuevo un `Long`
+  consecutivo (colección `contadores`, incremento atómico). La API, el frontend y Postman siguen viendo ids 1, 2, 3…
+- **Peticiones simultáneas:** el servicio verifica las reglas antes de guardar, y MongoDB detiene a la segunda de
+  dos peticiones que pasaron esa verificación al mismo tiempo (`OperacionesAtomicas`, ADR 0008). El error llega
+  antes de enviar el correo.
+  - Dos operaciones sobre el mismo préstamo (por ejemplo, aprobar y rechazar): cada cambio de estado es una
+    escritura condicional que solo reemplaza el documento si sigue en el estado de origen. La segunda responde 409.
+  - Aprobar toma primero el equipo (solo si sigue DISPONIBLE y activo) y después el préstamo; si el préstamo cambió
+    entretanto, devuelve el equipo a DISPONIBLE. Así el equipo nunca queda PRESTADO con un préstamo rechazado.
+  - Dos aprobaciones del mismo equipo: la segunda no consigue tomar el equipo, y además el índice único parcial
+    `ux_prestamos_equipo_en_curso` impide dos préstamos APROBADOS o VENCIDOS del mismo equipo. Responde 422.
+  - RN01 con solicitudes simultáneas: cada estudiante tiene un candado (colección `candados`); sus solicitudes pasan
+    de a una y cuentan bien. Las que sobran responden 422.
 - **Contraseñas:** BCrypt admite 72 bytes, no 72 caracteres. Una contraseña con tildes, ñ o emojis que pase de
   72 bytes se rechaza con 422 en lugar de provocar un 500.
 - **Recordatorios (RF11):** `enviarRecordatorios()` es de solo lectura y llama a `notificarRecordatorio`, nunca a
@@ -224,7 +225,7 @@ Esta sección resume los detalles de implementación.
 
 ```
 src/main/java/com/prestalab
-├── PrestalabApplication.java   (@EnableScheduling, @OpenAPIDefinition, @SecurityScheme bearerAuth)
+├── PrestalabApplication.java   (@EnableScheduling)
 ├── config/            SecurityConfig
 ├── controller/        AuthController, EquipoController, PrestamoController, DashboardController, UsuarioController
 ├── domain/
@@ -236,15 +237,15 @@ src/main/java/com/prestalab
 │                      ResumenDashboardDTO
 ├── mapper/            UsuarioMapper, EquipoMapper, PrestamoMapper
 ├── notification/      Notificador, EmailNotificador
-├── repository/        UsuarioRepository, EquipoRepository, PrestamoRepository
+├── repository/        UsuarioRepository, EquipoRepository, PrestamoRepository (MongoRepository),
+│                      GeneradorIds, OperacionesAtomicas
 ├── scheduler/         VencimientoScheduler, RecordatorioScheduler
-├── service/           *Service + *ServiceImpl (Usuario, Equipo, Prestamo, Dashboard)
+├── service/           *Service + *ServiceImpl (Usuario, Equipo, Prestamo, Dashboard), DatosIniciales
 └── web/error/         GlobalExceptionHandler
 src/main/resources
 ├── application.yml
-├── db/migration/      V1__esquema.sql, V2__datos_iniciales.sql, V3__reglas_concurrentes.sql
 └── templates/correo/  cambio-estado.html, recordatorio.html
 postman/               colección, entorno y README de las pruebas end-to-end
-docs/adr/              registro de decisiones de arquitectura (ADR 0001 a 0007)
+docs/adr/              registro de decisiones de arquitectura (ADR 0001 a 0008)
 frontend/              aplicación web React + Vite, su Dockerfile y la configuración de nginx
 ```

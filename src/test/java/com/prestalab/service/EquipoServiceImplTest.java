@@ -10,6 +10,7 @@ import com.prestalab.dto.EquipoDTO;
 import com.prestalab.dto.EquipoFormDTO;
 import com.prestalab.mapper.EquipoMapper;
 import com.prestalab.repository.EquipoRepository;
+import com.prestalab.repository.OperacionesAtomicas;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,12 +36,14 @@ class EquipoServiceImplTest {
 
     @Mock
     private EquipoRepository equipoRepository;
+    @Mock
+    private OperacionesAtomicas operaciones;
 
     private EquipoServiceImpl servicio;
 
     @BeforeEach
     void preparar() {
-        servicio = new EquipoServiceImpl(equipoRepository, new EquipoMapper());
+        servicio = new EquipoServiceImpl(equipoRepository, new EquipoMapper(), operaciones);
     }
 
     private Equipo equipo(String codigo, String nombre, CategoriaEquipo categoria) {
@@ -117,12 +121,12 @@ class EquipoServiceImplTest {
 
         @Test
         void normalizaElCodigoEnMayusculasYGuarda() {
-            when(equipoRepository.saveAndFlush(any(Equipo.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(equipoRepository.save(any(Equipo.class))).thenAnswer(inv -> inv.getArgument(0));
 
             EquipoDTO creado = servicio.crear(new EquipoFormDTO(" port-9 ", " Portátil HP ", "  ", CategoriaEquipo.PORTATIL));
 
             ArgumentCaptor<Equipo> captor = ArgumentCaptor.forClass(Equipo.class);
-            verify(equipoRepository).saveAndFlush(captor.capture());
+            verify(equipoRepository).save(captor.capture());
             assertThat(captor.getValue().getCodigo()).isEqualTo("PORT-9");
             assertThat(captor.getValue().getNombre()).isEqualTo("Portátil HP");
             assertThat(captor.getValue().getDescripcion()).isNull();
@@ -132,7 +136,7 @@ class EquipoServiceImplTest {
 
         @Test
         void codigoDuplicado() {
-            when(equipoRepository.saveAndFlush(any(Equipo.class)))
+            when(equipoRepository.save(any(Equipo.class)))
                     .thenThrow(new DataIntegrityViolationException("uk_equipos_codigo"));
 
             assertThatThrownBy(() -> servicio.crear(new EquipoFormDTO("CAM-1", "Cámara", null, CategoriaEquipo.CAMARA)))
@@ -149,7 +153,7 @@ class EquipoServiceImplTest {
             Equipo existente = equipo("CAM-1", "Cámara", CategoriaEquipo.CAMARA);
             existente.enviarAMantenimiento();
             when(equipoRepository.findById(3L)).thenReturn(Optional.of(existente));
-            when(equipoRepository.saveAndFlush(existente)).thenReturn(existente);
+            when(operaciones.guardarSiEstado(existente, EstadoEquipo.EN_MANTENIMIENTO)).thenReturn(true);
 
             EquipoDTO actualizado = servicio.actualizar(3L,
                     new EquipoFormDTO("CAM-10", "Cámara nueva", "Con lente", CategoriaEquipo.OTRO));
@@ -166,7 +170,8 @@ class EquipoServiceImplTest {
         void codigoDuplicado() {
             Equipo existente = equipo("CAM-1", "Cámara", CategoriaEquipo.CAMARA);
             when(equipoRepository.findById(3L)).thenReturn(Optional.of(existente));
-            when(equipoRepository.saveAndFlush(existente)).thenThrow(new DataIntegrityViolationException("dup"));
+            when(operaciones.guardarSiEstado(existente, EstadoEquipo.DISPONIBLE))
+                    .thenThrow(new DataIntegrityViolationException("uk_equipos_codigo"));
 
             assertThatThrownBy(() -> servicio.actualizar(3L,
                     new EquipoFormDTO("PORT-1", "Cámara", null, CategoriaEquipo.CAMARA)))
@@ -192,11 +197,12 @@ class EquipoServiceImplTest {
         void aMantenimientoDesdeDisponible() {
             Equipo existente = equipo("CAM-1", "Cámara", CategoriaEquipo.CAMARA);
             when(equipoRepository.findById(1L)).thenReturn(Optional.of(existente));
+            when(operaciones.guardarSiEstado(existente, EstadoEquipo.DISPONIBLE)).thenReturn(true);
 
             servicio.cambiarEstado(1L, EstadoEquipo.EN_MANTENIMIENTO);
 
             assertThat(existente.getEstado()).isEqualTo(EstadoEquipo.EN_MANTENIMIENTO);
-            verify(equipoRepository).save(existente);
+            verify(operaciones).guardarSiEstado(existente, EstadoEquipo.DISPONIBLE);
         }
 
         @Test
@@ -207,7 +213,7 @@ class EquipoServiceImplTest {
 
             assertThatThrownBy(() -> servicio.cambiarEstado(1L, EstadoEquipo.EN_MANTENIMIENTO))
                     .isInstanceOf(TransicionInvalidaException.class);
-            verify(equipoRepository, never()).save(any());
+            verifyNoInteractions(operaciones);
         }
 
         @Test
@@ -215,11 +221,12 @@ class EquipoServiceImplTest {
             Equipo existente = equipo("CAM-1", "Cámara", CategoriaEquipo.CAMARA);
             existente.enviarAMantenimiento();
             when(equipoRepository.findById(1L)).thenReturn(Optional.of(existente));
+            when(operaciones.guardarSiEstado(existente, EstadoEquipo.EN_MANTENIMIENTO)).thenReturn(true);
 
             servicio.cambiarEstado(1L, EstadoEquipo.DISPONIBLE);
 
             assertThat(existente.getEstado()).isEqualTo(EstadoEquipo.DISPONIBLE);
-            verify(equipoRepository).save(existente);
+            verify(operaciones).guardarSiEstado(existente, EstadoEquipo.EN_MANTENIMIENTO);
         }
 
         @Test
@@ -242,7 +249,7 @@ class EquipoServiceImplTest {
             assertThatThrownBy(() -> servicio.cambiarEstado(1L, EstadoEquipo.PRESTADO))
                     .isInstanceOf(ReglaNegocioException.class)
                     .hasMessage("El estado PRESTADO solo se asigna al aprobar un préstamo");
-            verify(equipoRepository, never()).save(any());
+            verifyNoInteractions(operaciones);
         }
 
         @Test
@@ -265,11 +272,12 @@ class EquipoServiceImplTest {
         void desactivaSinEliminar() {
             Equipo existente = equipo("CAM-1", "Cámara", CategoriaEquipo.CAMARA);
             when(equipoRepository.findById(1L)).thenReturn(Optional.of(existente));
+            when(operaciones.guardarSiEstado(existente, EstadoEquipo.DISPONIBLE)).thenReturn(true);
 
             servicio.desactivar(1L);
 
             assertThat(existente.isActivo()).isFalse();
-            verify(equipoRepository).save(existente);
+            verify(operaciones).guardarSiEstado(existente, EstadoEquipo.DISPONIBLE);
             verify(equipoRepository, never()).delete(any());
             verify(equipoRepository, never()).deleteById(any());
         }
@@ -281,6 +289,18 @@ class EquipoServiceImplTest {
             when(equipoRepository.findById(1L)).thenReturn(Optional.of(existente));
 
             assertThatThrownBy(() -> servicio.desactivar(1L)).isInstanceOf(TransicionInvalidaException.class);
+        }
+
+        @Test
+        void siOtraOperacionCambioElEquipoNoLoPisaYResponde409() {
+            Equipo existente = equipo("CAM-1", "Cámara", CategoriaEquipo.CAMARA);
+            when(equipoRepository.findById(1L)).thenReturn(Optional.of(existente));
+            // Entre la lectura y la escritura se aprobó un préstamo: el equipo ya no está DISPONIBLE.
+            when(operaciones.guardarSiEstado(existente, EstadoEquipo.DISPONIBLE)).thenReturn(false);
+
+            assertThatThrownBy(() -> servicio.desactivar(1L))
+                    .isInstanceOf(TransicionInvalidaException.class)
+                    .hasMessageContaining("cambió de estado en otra operación simultánea");
         }
     }
 }

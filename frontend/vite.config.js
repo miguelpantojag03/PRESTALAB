@@ -11,8 +11,6 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': backend,
-      '/v3/api-docs': backend,
-      '/swagger-ui': backend,
     },
   },
   test: {

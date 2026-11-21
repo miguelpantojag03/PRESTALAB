@@ -20,7 +20,6 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -30,7 +29,6 @@ import java.util.Locale;
 import java.util.Optional;
 
 @Service
-@Transactional(readOnly = true)
 public class UsuarioServiceImpl implements UsuarioService {
 
     private static final String CORREO_DUPLICADO = "Ya existe una cuenta con ese correo";
@@ -61,7 +59,6 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     @Override
-    @Transactional
     public UsuarioDTO registrar(RegistroUsuarioDTO dto) {
         if (dto.password().getBytes(StandardCharsets.UTF_8).length > MAXIMO_BYTES_PASSWORD) {
             throw new ReglaNegocioException("La contraseña es demasiado larga: con tildes, ñ o emojis "
@@ -75,9 +72,9 @@ public class UsuarioServiceImpl implements UsuarioService {
         Usuario usuario = new Usuario(dto.nombre().trim(), correo, passwordEncoder.encode(dto.password()),
                 Rol.ESTUDIANTE);
         try {
-            usuario = usuarioRepository.saveAndFlush(usuario);
+            usuario = usuarioRepository.save(usuario);
         } catch (DataIntegrityViolationException e) {
-            // Carrera entre dos registros simultáneos: la detecta el índice único sobre LOWER(correo).
+            // Carrera entre dos registros simultáneos: la detecta el índice único ux_usuarios_correo (sin distinguir mayúsculas).
             throw new ReglaNegocioException(CORREO_DUPLICADO);
         }
         return usuarioMapper.toDto(usuario);
@@ -116,7 +113,6 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     /** RF12. Desactivar no toca los préstamos del estudiante: el administrador los sigue gestionando. */
     @Override
-    @Transactional
     public void cambiarActivo(Long id, boolean activo) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario " + id + " no encontrado"));

@@ -1,45 +1,34 @@
 package com.prestalab.domain.model;
 
 import com.prestalab.domain.enums.Rol;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
-@Entity
-@Table(name = "usuarios")
+/** Colección usuarios. El id lo asigna repository.GeneradorIds (secuencia numérica, como el BIGSERIAL de antes). */
+@Document(collection = "usuarios")
 public class Usuario {
 
     private static final ZoneId ZONA = ZoneId.of("America/Bogota");
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
 
-    @Column(name = "correo", nullable = false, unique = true, length = 150)
+    // Único sin importar mayúsculas: la colación con strength 2 compara "ANA@x" y "ana@x" como iguales.
+    @Indexed(name = "ux_usuarios_correo", unique = true, collation = "{ 'locale': 'es', 'strength': 2 }")
     private String correo;
 
-    @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "rol", nullable = false, length = 20)
     private Rol rol;
 
-    @Column(name = "activo", nullable = false)
     private boolean activo;
 
-    @Column(name = "fecha_registro", nullable = false)
     private LocalDateTime fechaRegistro;
 
     protected Usuario() {

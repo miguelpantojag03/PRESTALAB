@@ -1,20 +1,14 @@
 package com.prestalab;
 
-import io.swagger.v3.oas.annotations.OpenAPIDefinition;
-import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
-import io.swagger.v3.oas.annotations.info.Info;
-import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.util.TimeZone;
 
+/** API REST de préstamo de equipos de laboratorio, con MongoDB. */
 @SpringBootApplication
 @EnableScheduling
-@OpenAPIDefinition(info = @Info(title = "PrestaLab API", version = "v1",
-        description = "API REST de préstamo de equipos de laboratorio"))
-@SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")
 public class PrestalabApplication {
 
     public static void main(String[] args) {

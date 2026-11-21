@@ -1,6 +1,7 @@
 # ADR 0006: Estrategia de pruebas en cuatro niveles
 
-**Estado:** Aceptada
+**Estado:** Aceptada. Con MongoDB (ADR 0008), el nivel 4 usa Testcontainers con MongoDB 7 en lugar de PostgreSQL 16:
+verifica los índices únicos (incluido el parcial), las escrituras condicionales, el candado y la siembra de datos.
 
 ## Contexto
 

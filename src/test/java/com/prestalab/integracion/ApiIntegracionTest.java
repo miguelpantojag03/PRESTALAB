@@ -16,7 +16,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -44,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** API completa de punta a punta (8.4) con PostgreSQL 16 real: flujo de D6, RF12 y OpenAPI. */
+/** API completa de punta a punta (8.4) con MongoDB 7 real: flujo de D6, RF12, concurrencia y sin Swagger. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -54,13 +54,11 @@ class ApiIntegracionTest {
     private static final LocalDate HOY = LocalDate.now(ZoneId.of("America/Bogota"));
 
     @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
+    static final MongoDBContainer MONGO = new MongoDBContainer("mongo:7.0");
 
     @DynamicPropertySource
     static void baseDeDatos(DynamicPropertyRegistry registro) {
-        registro.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registro.add("spring.datasource.username", POSTGRES::getUsername);
-        registro.add("spring.datasource.password", POSTGRES::getPassword);
+        registro.add("spring.data.mongodb.uri", () -> MONGO.getReplicaSetUrl("prestalab"));
     }
 
     @Autowired
@@ -294,28 +292,14 @@ class ApiIntegracionTest {
         }
     }
 
+    /** Por decisión del profesor la API no expone Swagger UI ni el contrato OpenAPI (ADR 0008). */
     @Test
-    void openApiDocumentaLos19EndpointsYElEsquemaBearer() throws Exception {
-        String docs = mvc.perform(get("/v3/api-docs"))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
-
-        Map<String, Map<String, Object>> paths = JsonPath.read(docs, "$.paths");
-        List<String> operaciones = paths.entrySet().stream()
-                .flatMap(e -> e.getValue().keySet().stream().map(m -> m.toUpperCase() + " " + e.getKey()))
-                .toList();
-        assertThat(operaciones).containsExactlyInAnyOrder(
-                "POST /api/v1/auth/registro", "POST /api/v1/auth/login",
-                "GET /api/v1/equipos", "POST /api/v1/equipos",
-                "GET /api/v1/equipos/{id}", "PUT /api/v1/equipos/{id}",
-                "PATCH /api/v1/equipos/{id}/estado", "POST /api/v1/equipos/{id}/desactivar",
-                "POST /api/v1/prestamos", "GET /api/v1/prestamos/mios",
-                "GET /api/v1/prestamos/pendientes", "GET /api/v1/prestamos/por-devolver",
-                "POST /api/v1/prestamos/{id}/aprobar", "POST /api/v1/prestamos/{id}/rechazar",
-                "POST /api/v1/prestamos/{id}/devolver", "GET /api/v1/dashboard/resumen",
-                "GET /api/v1/usuarios/estudiantes", "POST /api/v1/usuarios/{id}/activar",
-                "POST /api/v1/usuarios/{id}/desactivar");
-        assertThat((String) JsonPath.read(docs, "$.components.securitySchemes.bearerAuth.scheme")).isEqualTo("bearer");
-        assertThat((String) JsonPath.read(docs, "$.components.securitySchemes.bearerAuth.bearerFormat")).isEqualTo("JWT");
+    void swaggerYOpenApiYaNoExisten() throws Exception {
+        String admin = login("admin@prestalab.local", "Admin123*");
+        for (String ruta : List.of("/v3/api-docs", "/swagger-ui.html", "/swagger-ui/index.html")) {
+            mvc.perform(con(admin, get(ruta)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.codigo").value("RECURSO_NO_ENCONTRADO"));
+        }
     }
 }

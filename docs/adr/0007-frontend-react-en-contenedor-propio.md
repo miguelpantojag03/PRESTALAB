@@ -1,6 +1,6 @@
 # ADR 0007: Frontend React en un contenedor propio
 
-**Estado:** Aceptada. Amplía D1 y D8.
+**Estado:** Aceptada. Amplía D1 y D8. Desde el ADR 0008 la API no tiene Swagger, así que nginx solo reenvía `/api`.
 
 ## Contexto
 

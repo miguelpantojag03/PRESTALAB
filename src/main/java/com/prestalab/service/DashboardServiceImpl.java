@@ -6,10 +6,8 @@ import com.prestalab.dto.ResumenDashboardDTO;
 import com.prestalab.repository.EquipoRepository;
 import com.prestalab.repository.PrestamoRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional(readOnly = true)
 public class DashboardServiceImpl implements DashboardService {
 
     private final EquipoRepository equipoRepository;

@@ -3,41 +3,28 @@ package com.prestalab.domain.model;
 import com.prestalab.domain.enums.CategoriaEquipo;
 import com.prestalab.domain.enums.EstadoEquipo;
 import com.prestalab.domain.exception.TransicionInvalidaException;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-@Entity
-@Table(name = "equipos")
+/** Colección equipos. El id lo asigna repository.GeneradorIds. */
+@Document(collection = "equipos")
 public class Equipo {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "codigo", nullable = false, unique = true, length = 30)
+    @Indexed(name = "uk_equipos_codigo", unique = true)
     private String codigo;
 
-    @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
 
-    @Column(name = "descripcion", length = 500)
     private String descripcion;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "categoria", nullable = false, length = 20)
     private CategoriaEquipo categoria;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "estado", nullable = false, length = 20)
     private EstadoEquipo estado;
 
-    @Column(name = "activo", nullable = false)
     private boolean activo;
 
     protected Equipo() {

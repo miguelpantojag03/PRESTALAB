@@ -100,7 +100,7 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
-                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/equipos/**").hasAnyRole("ESTUDIANTE", "ADMIN")
                         .requestMatchers("/api/v1/equipos/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/prestamos").hasRole("ESTUDIANTE")

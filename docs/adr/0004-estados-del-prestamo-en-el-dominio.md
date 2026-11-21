@@ -1,6 +1,7 @@
 # ADR 0004: Las transiciones del préstamo viven en la entidad
 
-**Estado:** Aceptada
+**Estado:** Aceptada. Con MongoDB (ADR 0008), las transiciones siguen viviendo en la entidad, pero los triggers de V3
+se reemplazaron por escrituras condicionales y un candado por estudiante (`OperacionesAtomicas`).
 
 ## Contexto
 

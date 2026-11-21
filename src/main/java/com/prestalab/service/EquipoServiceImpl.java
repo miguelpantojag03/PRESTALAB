@@ -4,29 +4,36 @@ import com.prestalab.domain.enums.CategoriaEquipo;
 import com.prestalab.domain.enums.EstadoEquipo;
 import com.prestalab.domain.exception.RecursoNoEncontradoException;
 import com.prestalab.domain.exception.ReglaNegocioException;
+import com.prestalab.domain.exception.TransicionInvalidaException;
 import com.prestalab.domain.model.Equipo;
 import com.prestalab.dto.EquipoDTO;
 import com.prestalab.dto.EquipoFormDTO;
 import com.prestalab.mapper.EquipoMapper;
 import com.prestalab.repository.EquipoRepository;
+import com.prestalab.repository.OperacionesAtomicas;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Equipos sobre MongoDB. Los cambios de un equipo existente se guardan con escritura condicional: si su estado
+ * cambió entretanto (por ejemplo, porque se aprobó un préstamo), no se pisa y se responde 409.
+ */
 @Service
-@Transactional(readOnly = true)
 public class EquipoServiceImpl implements EquipoService {
 
     private final EquipoRepository equipoRepository;
     private final EquipoMapper equipoMapper;
+    private final OperacionesAtomicas operaciones;
 
-    public EquipoServiceImpl(EquipoRepository equipoRepository, EquipoMapper equipoMapper) {
+    public EquipoServiceImpl(EquipoRepository equipoRepository, EquipoMapper equipoMapper,
+                             OperacionesAtomicas operaciones) {
         this.equipoRepository = equipoRepository;
         this.equipoMapper = equipoMapper;
+        this.operaciones = operaciones;
     }
 
     @Override
@@ -46,7 +53,6 @@ public class EquipoServiceImpl implements EquipoService {
     }
 
     @Override
-    @Transactional
     public EquipoDTO crear(EquipoFormDTO dto) {
         EquipoFormDTO normalizado = normalizar(dto);
         Equipo equipo = equipoMapper.toEntity(normalizado);
@@ -54,21 +60,26 @@ public class EquipoServiceImpl implements EquipoService {
     }
 
     @Override
-    @Transactional
     public EquipoDTO actualizar(Long id, EquipoFormDTO dto) {
         Equipo equipo = buscar(id);
+        EstadoEquipo estadoLeido = equipo.getEstado();
         EquipoFormDTO normalizado = normalizar(dto);
         equipoMapper.aplicar(normalizado, equipo);
-        return equipoMapper.toDto(guardar(equipo, normalizado.codigo()));
+        try {
+            guardarSiSigue(equipo, estadoLeido);
+        } catch (DataIntegrityViolationException e) {
+            throw codigoDuplicado(normalizado.codigo());
+        }
+        return equipoMapper.toDto(equipo);
     }
 
     @Override
-    @Transactional
     public void cambiarEstado(Long id, EstadoEquipo estado) {
         if (estado == null) {
             throw new ReglaNegocioException("Debes indicar el nuevo estado del equipo");
         }
         Equipo equipo = buscar(id);
+        EstadoEquipo estadoLeido = equipo.getEstado();
         switch (estado) {
             case EN_MANTENIMIENTO -> equipo.enviarAMantenimiento();
             case DISPONIBLE -> {
@@ -80,16 +91,16 @@ public class EquipoServiceImpl implements EquipoService {
             }
             case PRESTADO -> throw new ReglaNegocioException("El estado PRESTADO solo se asigna al aprobar un préstamo");
         }
-        equipoRepository.save(equipo);
+        guardarSiSigue(equipo, estadoLeido);
     }
 
     @Override
-    @Transactional
     public void desactivar(Long id) {
         Equipo equipo = buscar(id);
+        EstadoEquipo estadoLeido = equipo.getEstado();
         // RN07: nunca se elimina; solo se desactiva.
         equipo.desactivar();
-        equipoRepository.save(equipo);
+        guardarSiSigue(equipo, estadoLeido);
     }
 
     private Equipo buscar(Long id) {
@@ -99,10 +110,22 @@ public class EquipoServiceImpl implements EquipoService {
 
     private Equipo guardar(Equipo equipo, String codigo) {
         try {
-            return equipoRepository.saveAndFlush(equipo);
+            return equipoRepository.save(equipo);
         } catch (DataIntegrityViolationException e) {
-            throw new ReglaNegocioException("Ya existe un equipo con el código " + codigo);
+            throw codigoDuplicado(codigo);
         }
+    }
+
+    /** Guarda el equipo solo si su estado sigue siendo el que se leyó; si no, otra operación lo cambió. */
+    private void guardarSiSigue(Equipo equipo, EstadoEquipo estadoLeido) {
+        if (!operaciones.guardarSiEstado(equipo, estadoLeido)) {
+            throw new TransicionInvalidaException("El equipo " + equipo.getCodigo()
+                    + " cambió de estado en otra operación simultánea; vuelve a consultarlo");
+        }
+    }
+
+    private static ReglaNegocioException codigoDuplicado(String codigo) {
+        return new ReglaNegocioException("Ya existe un equipo con el código " + codigo);
     }
 
     private EquipoFormDTO normalizar(EquipoFormDTO dto) {

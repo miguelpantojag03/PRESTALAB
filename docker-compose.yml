@@ -1,6 +1,6 @@
-# Despliegue de PrestaLab (D8): cuatro contenedores en la red prestalab-net y el volumen pgdata.
+# Despliegue de PrestaLab (D8): cuatro contenedores en la red prestalab-net y el volumen mongodata.
 # prestalab-web sirve el frontend en http://localhost:3000 y reenvía /api a prestalab-app.
-# Las credenciales de la base de datos y el secreto JWT se leen de .env (ver .env.example); nunca se versionan.
+# Las credenciales de MongoDB y el secreto JWT se leen de .env (ver .env.example); nunca se versionan.
 services:
   prestalab-web:
     build: ./frontend
@@ -19,9 +19,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://prestalab-db:5432/prestalab
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      SPRING_DATA_MONGODB_URI: mongodb://${MONGO_USER:?Define MONGO_USER en .env}:${MONGO_PASSWORD:?Define MONGO_PASSWORD en .env}@prestalab-db:27017/prestalab?authSource=admin
       SPRING_MAIL_HOST: prestalab-mail
       SPRING_MAIL_PORT: 1025
       PRESTALAB_JWT_SECRET: ${PRESTALAB_JWT_SECRET:?Define PRESTALAB_JWT_SECRET en .env}
@@ -35,18 +33,18 @@ services:
       - prestalab-net
 
   prestalab-db:
-    image: postgres:16
+    image: mongo:7.0
     container_name: prestalab-db
     ports:
-      - "5432:5432"
+      - "27017:27017"
     environment:
-      POSTGRES_DB: prestalab
-      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:?Define MONGO_USER en .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Define MONGO_PASSWORD en .env}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mongodata:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d prestalab"]
+      # ping no necesita autenticarse; si el servidor no responde, mongosh termina con error.
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -67,4 +65,4 @@ networks:
     driver: bridge
 
 volumes:
-  pgdata:
+  mongodata:

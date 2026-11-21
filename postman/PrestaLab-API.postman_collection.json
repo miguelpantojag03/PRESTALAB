@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "6c1d3f7a-2b8e-4c51-9a0e-5f3b7d2e8a41",
     "name": "PrestaLab API",
-    "description": "Pruebas end-to-end de la API REST de PrestaLab (Java 21, Spring Boot 3, JWT, ProblemDetail).\n\nEjecutar en orden con el entorno \"PrestaLab API (local)\" y la aplicación levantada con docker compose. La corrida crea su propio estudiante y su propio equipo, así que se puede repetir sin límite; al final deja el equipo devuelto y desactivado, y al estudiante activo.\n\nFuera del alcance de HTTP (cubierto por JUnit): RF09 y RF11 (tareas programadas) y RN04 (exige que pase el tiempo).",
+    "description": "Pruebas end-to-end de la API REST de PrestaLab (Java 21, Spring Boot 3, MongoDB, JWT, ProblemDetail). La API no publica Swagger ni OpenAPI: esta colección es su documentación ejecutable.\n\nEjecutar en orden con el entorno \"PrestaLab API (local)\" y la aplicación levantada con docker compose. La corrida crea su propio estudiante y su propio equipo, así que se puede repetir sin límite; al final deja el equipo devuelto y desactivado, y al estudiante activo.\n\nFuera del alcance de HTTP (cubierto por JUnit): RF09 y RF11 (tareas programadas) y RN04 (exige que pase el tiempo).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -146,7 +146,7 @@
           "        .filter(function (valor) { return !!valor; })",
           "        .forEach(function (valor) { pm.expect(texto, 'contraseña en claro').to.not.include(valor); });",
           "});",
-          "// Solo las respuestas de la API de PrestaLab (no las de Swagger ni Mailpit); la URL puede venir resuelta o no.",
+          "// Solo las respuestas de la API de PrestaLab (no las de Mailpit); la URL puede venir resuelta o no.",
           "const url = pm.request.url.toString();",
           "const baseUrl = pm.environment.get('baseUrl') || '';",
           "const esApi = (baseUrl && url.indexOf(baseUrl) === 0) || url.indexOf('{{baseUrl}}') === 0;",
@@ -342,7 +342,7 @@
       "description": "Genera los datos de la corrida y verifica que la documentación OpenAPI y Swagger UI estén publicadas.",
       "item": [
         {
-          "name": "00.01 Obtener la especificación OpenAPI → 200",
+          "name": "00.01 El contrato OpenAPI ya no se publica → 401",
           "event": [
             {
               "listen": "prerequest",
@@ -378,29 +378,12 @@
                 "type": "text/javascript",
                 "exec": [
                   "const h = eval(pm.collectionVariables.get('_helpers'))(pm);",
-                  "const doc = pm.response.json();",
-                  "pm.test('Responde 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Es un documento OpenAPI 3 con paths', function () {",
-                  "    pm.expect(doc.openapi).to.match(/^3\\./);",
-                  "    pm.expect(doc.paths).to.be.an('object');",
-                  "});",
-                  "pm.test('Documenta exactamente los 19 endpoints de la API', function () {",
-                  "    const operaciones = [];",
-                  "    Object.keys(doc.paths).forEach(function (ruta) {",
-                  "        Object.keys(doc.paths[ruta]).forEach(function (metodo) {",
-                  "            if (['get', 'post', 'put', 'patch', 'delete'].indexOf(metodo) >= 0) {",
-                  "                operaciones.push(metodo.toUpperCase() + ' ' + ruta);",
-                  "            }",
-                  "        });",
-                  "    });",
-                  "    const esperadas = [\"POST /api/v1/auth/registro\", \"POST /api/v1/auth/login\", \"GET /api/v1/equipos\", \"POST /api/v1/equipos\", \"GET /api/v1/equipos/{id}\", \"PUT /api/v1/equipos/{id}\", \"PATCH /api/v1/equipos/{id}/estado\", \"POST /api/v1/equipos/{id}/desactivar\", \"POST /api/v1/prestamos\", \"GET /api/v1/prestamos/mios\", \"GET /api/v1/prestamos/pendientes\", \"GET /api/v1/prestamos/por-devolver\", \"POST /api/v1/prestamos/{id}/aprobar\", \"POST /api/v1/prestamos/{id}/rechazar\", \"POST /api/v1/prestamos/{id}/devolver\", \"GET /api/v1/dashboard/resumen\", \"GET /api/v1/usuarios/estudiantes\", \"POST /api/v1/usuarios/{id}/activar\", \"POST /api/v1/usuarios/{id}/desactivar\"];",
-                  "    pm.expect(operaciones.slice().sort()).to.eql(esperadas.slice().sort());",
-                  "});",
-                  "pm.test('Define el esquema de seguridad bearerAuth (JWT)', function () {",
-                  "    const esquema = doc.components.securitySchemes.bearerAuth;",
-                  "    pm.expect(esquema.type).to.eql('http');",
-                  "    pm.expect(esquema.scheme).to.eql('bearer');",
-                  "    pm.expect(esquema.bearerFormat).to.eql('JWT');",
+                  "// La API ya no expone Swagger UI ni el contrato OpenAPI (ADR 0008): la ruta queda protegida como cualquier otra.",
+                  "h.esperarProblema(401, 'NO_AUTENTICADO');",
+                  "pm.test('No sirve el documento OpenAPI', function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Type') || '').to.not.include('text/html');",
+                  "    pm.expect(pm.response.text()).to.not.include('openapi');",
+                  "    pm.expect(pm.response.headers.get('Location'), 'no redirige a swagger-ui').to.be.undefined;",
                   "});"
                 ]
               }
@@ -419,14 +402,14 @@
                 "api-docs"
               ]
             },
-            "description": "Pública. El script previo genera las variables de la corrida (correo y código únicos, fechas en America/Bogota). Verifica que el contrato documenta exactamente los 19 endpoints de la sección 2 y el esquema de seguridad bearerAuth (JWT).",
+            "description": "Pública. El script previo genera las variables de la corrida (correo y código únicos, fechas en America/Bogota). Verifica que /v3/api-docs ya no existe como recurso público: la API no publica OpenAPI (ADR 0008) y responde 401 como cualquier ruta protegida.",
             "auth": {
               "type": "noauth"
             }
           }
         },
         {
-          "name": "00.02 Abrir Swagger UI → 200 o 302",
+          "name": "00.02 Swagger UI ya no existe → 401",
           "event": [
             {
               "listen": "test",
@@ -434,16 +417,12 @@
                 "type": "text/javascript",
                 "exec": [
                   "const h = eval(pm.collectionVariables.get('_helpers'))(pm);",
-                  "pm.test('Responde 200 o 302', function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 302]);",
-                  "});",
-                  "pm.test('Si redirige, apunta a la interfaz de Swagger', function () {",
-                  "    if (pm.response.code === 302) {",
-                  "        pm.expect(pm.response.headers.get('Location')).to.include('swagger-ui');",
-                  "    }",
-                  "});",
-                  "pm.test('Swagger UI es público (no exige token)', function () {",
-                  "    pm.expect(pm.response.code).to.not.be.oneOf([401, 403]);",
+                  "// La API ya no expone Swagger UI ni el contrato OpenAPI (ADR 0008): la ruta queda protegida como cualquier otra.",
+                  "h.esperarProblema(401, 'NO_AUTENTICADO');",
+                  "pm.test('No sirve la interfaz de Swagger', function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Type') || '').to.not.include('text/html');",
+                  "    pm.expect(pm.response.text()).to.not.include('openapi');",
+                  "    pm.expect(pm.response.headers.get('Location'), 'no redirige a swagger-ui').to.be.undefined;",
                   "});"
                 ]
               }
@@ -461,7 +440,7 @@
                 "swagger-ui.html"
               ]
             },
-            "description": "Pública. Swagger UI permite probar la API desde el navegador con el botón Authorize. No se siguen redirecciones: /swagger-ui.html responde 302 hacia /swagger-ui/index.html.",
+            "description": "Pública. Verifica que /swagger-ui.html ya no sirve la interfaz de Swagger ni redirige a ella (ADR 0008). La documentación de la API es esta colección y el README.",
             "auth": {
               "type": "noauth"
             }

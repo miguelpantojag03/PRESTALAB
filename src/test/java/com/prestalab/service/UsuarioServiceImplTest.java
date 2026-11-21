@@ -66,12 +66,12 @@ class UsuarioServiceImplTest {
     void registraSiempreComoEstudianteConCorreoNormalizadoYContrasenaHasheada() {
         when(usuarioRepository.findByCorreo("ana@uni.edu.co")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("Secreta123")).thenReturn("$2a$12$hash");
-        when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UsuarioDTO dto = servicio.registrar(new RegistroUsuarioDTO("  Ana Pérez ", "  Ana@UNI.edu.CO ", "Secreta123"));
 
         ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
-        verify(usuarioRepository).saveAndFlush(captor.capture());
+        verify(usuarioRepository).save(captor.capture());
         Usuario guardado = captor.getValue();
         assertThat(guardado.getCorreo()).isEqualTo("ana@uni.edu.co");
         assertThat(guardado.getNombre()).isEqualTo("Ana Pérez");
@@ -90,14 +90,14 @@ class UsuarioServiceImplTest {
         assertThatThrownBy(() -> servicio.registrar(new RegistroUsuarioDTO("Ana", "ANA@uni.edu.co", "Secreta123")))
                 .isInstanceOf(ReglaNegocioException.class)
                 .hasMessage("Ya existe una cuenta con ese correo");
-        verify(usuarioRepository, never()).saveAndFlush(any());
+        verify(usuarioRepository, never()).save(any());
     }
 
     @Test
     void carreraEnElIndiceUnicoSeTraduceEnReglaDeNegocio() {
         when(usuarioRepository.findByCorreo("ana@uni.edu.co")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(any())).thenReturn("hash");
-        when(usuarioRepository.saveAndFlush(any(Usuario.class)))
+        when(usuarioRepository.save(any(Usuario.class)))
                 .thenThrow(new DataIntegrityViolationException("ux_usuarios_correo"));
 
         assertThatThrownBy(() -> servicio.registrar(new RegistroUsuarioDTO("Ana", "ana@uni.edu.co", "Secreta123")))
@@ -113,7 +113,7 @@ class UsuarioServiceImplTest {
                 .isInstanceOf(ReglaNegocioException.class)
                 .hasMessageContaining("demasiado larga");
         verify(passwordEncoder, never()).encode(any());
-        verify(usuarioRepository, never()).saveAndFlush(any());
+        verify(usuarioRepository, never()).save(any());
     }
 
     @Test
@@ -121,7 +121,7 @@ class UsuarioServiceImplTest {
         String setentaYDosBytes = "ñ".repeat(36);
         when(usuarioRepository.findByCorreo("ana@uni.edu.co")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(setentaYDosBytes)).thenReturn("hash");
-        when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         assertThat(servicio.registrar(new RegistroUsuarioDTO("Ana", "ana@uni.edu.co", setentaYDosBytes)).correo())
                 .isEqualTo("ana@uni.edu.co");

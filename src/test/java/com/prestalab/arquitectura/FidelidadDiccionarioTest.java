@@ -31,12 +31,10 @@ import com.prestalab.service.DashboardService;
 import com.prestalab.service.EquipoService;
 import com.prestalab.service.PrestamoService;
 import com.prestalab.service.UsuarioService;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.DocumentReference;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -106,7 +104,7 @@ class FidelidadDiccionarioTest {
     }
 
     @Test
-    void cadaEntidadTieneUnSoloConstructorPublicoYUnoProtegidoParaJpa() {
+    void cadaEntidadTieneUnSoloConstructorPublicoYUnoProtegidoParaSpringData() {
         for (Class<?> entidad : List.of(Usuario.class, Equipo.class, Prestamo.class)) {
             assertThat(Arrays.stream(entidad.getConstructors()).count()).as(entidad.getSimpleName()).isEqualTo(1);
             assertThat(Arrays.stream(entidad.getDeclaredConstructors())
@@ -114,17 +112,23 @@ class FidelidadDiccionarioTest {
         }
     }
 
+    /**
+     * D4 en MongoDB: cada entidad es un documento de su propia colección y el préstamo apunta a su usuario y a su
+     * equipo por referencia (guarda el id), sin embeberlos ni copiarlos. Ninguna entidad guarda listas de otras
+     * (el equivalente de no tener @OneToMany).
+     */
     @Test
-    void asociacionesDirigidasSinCascadeNiOneToMany() throws NoSuchFieldException {
+    void asociacionesDirigidasPorReferenciaSinColeccionesInversas() throws NoSuchFieldException {
+        assertThat(Usuario.class.getAnnotation(Document.class).collection()).isEqualTo("usuarios");
+        assertThat(Equipo.class.getAnnotation(Document.class).collection()).isEqualTo("equipos");
+        assertThat(Prestamo.class.getAnnotation(Document.class).collection()).isEqualTo("prestamos");
         for (String campo : List.of("usuario", "equipo")) {
-            ManyToOne relacion = Prestamo.class.getDeclaredField(campo).getAnnotation(ManyToOne.class);
-            assertThat(relacion.fetch()).isEqualTo(FetchType.LAZY);
-            assertThat(relacion.optional()).isFalse();
-            assertThat(relacion.cascade()).isEqualTo(new CascadeType[0]);
+            assertThat(Prestamo.class.getDeclaredField(campo).isAnnotationPresent(DocumentReference.class))
+                    .as(campo).isTrue();
         }
         for (Class<?> entidad : List.of(Usuario.class, Equipo.class, Prestamo.class)) {
-            assertThat(Arrays.stream(entidad.getDeclaredFields()).noneMatch(f -> f.isAnnotationPresent(OneToMany.class)))
-                    .isTrue();
+            assertThat(Arrays.stream(entidad.getDeclaredFields())
+                    .noneMatch(f -> java.util.Collection.class.isAssignableFrom(f.getType()))).isTrue();
         }
     }
 

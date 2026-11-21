@@ -2,17 +2,10 @@ package com.prestalab.domain.model;
 
 import com.prestalab.domain.enums.EstadoPrestamo;
 import com.prestalab.domain.exception.TransicionInvalidaException;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.DocumentReference;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,9 +16,16 @@ import java.time.ZoneId;
  * PENDIENTE → APROBADO | RECHAZADO; APROBADO → DEVUELTO | VENCIDO; VENCIDO → DEVUELTO.
  * Cualquier otra transición lanza {@link TransicionInvalidaException}.
  * La notificación ("/ notificar") la hace el servicio, nunca la entidad.
+ *
+ * <p>Colección prestamos. Usuario y equipo se guardan como referencias (su id) y se cargan al leer el préstamo.
+ * El índice único parcial ux_prestamos_equipo_en_curso impide que un equipo esté en dos préstamos APROBADOS o
+ * VENCIDOS a la vez, aunque dos aprobaciones lleguen al mismo tiempo.
  */
-@Entity
-@Table(name = "prestamos")
+@Document(collection = "prestamos")
+@CompoundIndex(name = "ux_prestamos_equipo_en_curso", def = "{ 'equipo': 1 }", unique = true,
+        partialFilter = "{ 'estado': { '$in': [ 'APROBADO', 'VENCIDO' ] } }")
+@CompoundIndex(name = "ix_prestamos_usuario_estado", def = "{ 'usuario': 1, 'estado': 1 }")
+@CompoundIndex(name = "ix_prestamos_estado_fecha", def = "{ 'estado': 1, 'fechaDevolucionEsperada': 1 }")
 public class Prestamo {
 
     private static final ZoneId ZONA = ZoneId.of("America/Bogota");
@@ -33,34 +33,24 @@ public class Prestamo {
     private static final int LONGITUD_MAXIMA_MOTIVO = 500;
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "usuario_id", nullable = false)
+    @DocumentReference
     private Usuario usuario;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "equipo_id", nullable = false)
+    @DocumentReference
     private Equipo equipo;
 
-    @Column(name = "fecha_solicitud", nullable = false)
     private LocalDate fechaSolicitud;
 
-    @Column(name = "fecha_devolucion_esperada", nullable = false)
     private LocalDate fechaDevolucionEsperada;
 
-    @Column(name = "fecha_aprobacion")
     private LocalDateTime fechaAprobacion;
 
-    @Column(name = "fecha_devolucion_real")
     private LocalDate fechaDevolucionReal;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "estado", nullable = false, length = 20)
     private EstadoPrestamo estado;
 
-    @Column(name = "motivo_rechazo", length = 500)
     private String motivoRechazo;
 
     protected Prestamo() {

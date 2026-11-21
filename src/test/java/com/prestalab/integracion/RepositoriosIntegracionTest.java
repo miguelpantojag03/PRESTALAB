@@ -8,47 +8,55 @@ import com.prestalab.domain.model.Equipo;
 import com.prestalab.domain.model.Prestamo;
 import com.prestalab.domain.model.Usuario;
 import com.prestalab.repository.EquipoRepository;
+import com.prestalab.repository.GeneradorIds;
+import com.prestalab.repository.OperacionesAtomicas;
 import com.prestalab.repository.PrestamoRepository;
 import com.prestalab.repository.UsuarioRepository;
-import jakarta.persistence.EntityManager;
+import com.prestalab.service.DatosIniciales;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.boot.test.autoconfigure.data.mongo.DataMongoTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Persistencia contra PostgreSQL 16 real: Flyway aplica V1 y V2, Hibernate valida el esquema
- * (ddl-auto: validate) y las restricciones de la base de datos funcionan.
+ * Persistencia contra MongoDB 7 real: los datos iniciales, las consultas de los repositorios, los índices únicos
+ * (incluido el parcial) y las operaciones atómicas que reemplazan a los triggers de PostgreSQL.
  */
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@DataMongoTest
+@Import({GeneradorIds.class, OperacionesAtomicas.class, DatosIniciales.class})
 @Testcontainers(disabledWithoutDocker = true)
 class RepositoriosIntegracionTest {
 
     private static final LocalDate HOY = LocalDate.now(ZoneId.of("America/Bogota"));
 
     @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
+    static final MongoDBContainer MONGO = new MongoDBContainer("mongo:7.0");
 
     @DynamicPropertySource
     static void baseDeDatos(DynamicPropertyRegistry registro) {
-        registro.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registro.add("spring.datasource.username", POSTGRES::getUsername);
-        registro.add("spring.datasource.password", POSTGRES::getPassword);
+        registro.add("spring.data.mongodb.uri", () -> MONGO.getReplicaSetUrl("prestalab"));
     }
 
     @Autowired
@@ -58,37 +66,55 @@ class RepositoriosIntegracionTest {
     @Autowired
     private PrestamoRepository prestamoRepository;
     @Autowired
-    private EntityManager entityManager;
+    private OperacionesAtomicas operaciones;
+    @Autowired
+    private DatosIniciales datosIniciales;
+    @Autowired
+    private MongoTemplate mongo;
 
     private Usuario ana;
 
+    /** Sin transacciones que revertir: cada prueba vacía las colecciones (conservando los índices) y vuelve a sembrar. */
     @BeforeEach
     void preparar() {
-        ana = usuarioRepository.saveAndFlush(new Usuario("Ana", "ana@uni.edu.co", "hash", Rol.ESTUDIANTE));
+        for (String coleccion : List.of("prestamos", "usuarios", "equipos", "candados")) {
+            mongo.remove(new Query(), coleccion);
+        }
+        datosIniciales.sembrar();
+        ana = usuarioRepository.save(new Usuario("Ana", "ana@uni.edu.co", "hash", Rol.ESTUDIANTE));
     }
 
     private Equipo nuevoEquipo(String codigo) {
-        return equipoRepository.saveAndFlush(new Equipo(codigo, "Equipo " + codigo, null, CategoriaEquipo.OTRO));
+        return equipoRepository.save(new Equipo(codigo, "Equipo " + codigo, null, CategoriaEquipo.OTRO));
     }
 
-    private int ejecutarSql(String sql, Object... parametros) {
-        var consulta = entityManager.createNativeQuery(sql);
-        for (int i = 0; i < parametros.length; i++) {
-            consulta.setParameter(i + 1, parametros[i]);
-        }
-        return consulta.executeUpdate();
+    private Usuario nuevoEstudiante(String nombre) {
+        return usuarioRepository.save(new Usuario(nombre, nombre.toLowerCase() + "@uni.edu.co", "hash", Rol.ESTUDIANTE));
     }
 
     @Test
-    void flywayAplicaV1YV2() {
+    void siembraElAdministradorYLosEquiposDeEjemplo() {
         Usuario admin = usuarioRepository.findByCorreo("admin@prestalab.local").orElseThrow();
         assertThat(admin.getRol()).isEqualTo(Rol.ADMIN);
         assertThat(admin.isActivo()).isTrue();
         assertThat(admin.getPasswordHash()).startsWith("$2a$12$");
 
-        assertThat(equipoRepository.findByActivoTrue()).hasSizeGreaterThanOrEqualTo(8)
+        assertThat(equipoRepository.findByActivoTrue()).hasSize(9)
                 .extracting(Equipo::getCategoria).contains(CategoriaEquipo.values());
         assertThat(prestamoRepository.count()).isZero();
+
+        datosIniciales.sembrar();
+        assertThat(equipoRepository.count()).as("sembrar de nuevo no duplica").isEqualTo(9);
+    }
+
+    @Test
+    void losIdsSonNumerosConsecutivosPorColeccion() {
+        Equipo primero = nuevoEquipo("ID-1");
+        Equipo segundo = nuevoEquipo("ID-2");
+
+        assertThat(primero.getId()).isNotNull();
+        assertThat(segundo.getId()).isEqualTo(primero.getId() + 1);
+        assertThat(equipoRepository.findById(segundo.getId())).get().extracting(Equipo::getCodigo).isEqualTo("ID-2");
     }
 
     @Test
@@ -99,10 +125,11 @@ class RepositoriosIntegracionTest {
 
         Equipo prestado = nuevoEquipo("T-PRES");
         prestado.marcarPrestado();
+        equipoRepository.save(prestado);
         Equipo inactivo = nuevoEquipo("T-INAC");
         inactivo.desactivar();
+        equipoRepository.save(inactivo);
         nuevoEquipo("T-DISP");
-        equipoRepository.flush();
 
         assertThat(equipoRepository.countByEstado(EstadoEquipo.PRESTADO)).isEqualTo(1);
         assertThat(equipoRepository.countByEstado(EstadoEquipo.DISPONIBLE)).isEqualTo(disponiblesAntes + 2);
@@ -112,9 +139,8 @@ class RepositoriosIntegracionTest {
     }
 
     @Test
-    void prestamoRepositoryMetodosDerivados() {
-        // RN01 (V3): Ana tiene a lo sumo 2 activos, así que el préstamo atrasado es de Beto.
-        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto", "beto@uni.edu.co", "hash", Rol.ESTUDIANTE));
+    void prestamoRepositoryConsultasPorUsuarioYPorEstado() {
+        Usuario beto = nuevoEstudiante("Beto");
         Prestamo pendiente = prestamoRepository.save(new Prestamo(ana, nuevoEquipo("T-1"), HOY, HOY.plusDays(2)));
 
         Prestamo aprobado = new Prestamo(ana, nuevoEquipo("T-2"), HOY.minusDays(1), HOY.plusDays(3));
@@ -129,13 +155,14 @@ class RepositoriosIntegracionTest {
         vencido.aprobar();
         vencido.marcarVencido();
         prestamoRepository.save(vencido);
-        prestamoRepository.flush();
-        entityManager.clear();
 
         assertThat(prestamoRepository.countByUsuarioIdAndEstadoIn(ana.getId(),
                 List.of(EstadoPrestamo.PENDIENTE, EstadoPrestamo.APROBADO))).isEqualTo(2);
+        assertThat(prestamoRepository.countByUsuarioIdAndEstadoIn(beto.getId(),
+                List.of(EstadoPrestamo.PENDIENTE, EstadoPrestamo.APROBADO))).isEqualTo(1);
         assertThat(prestamoRepository.existsByUsuarioIdAndEstado(ana.getId(), EstadoPrestamo.VENCIDO)).isTrue();
         assertThat(prestamoRepository.existsByUsuarioIdAndEstado(ana.getId(), EstadoPrestamo.RECHAZADO)).isFalse();
+        assertThat(prestamoRepository.existsByUsuarioIdAndEstado(beto.getId(), EstadoPrestamo.VENCIDO)).isFalse();
 
         assertThat(prestamoRepository.findByEstadoAndFechaDevolucionEsperadaBefore(EstadoPrestamo.APROBADO, HOY))
                 .extracting(Prestamo::getId).containsExactly(atrasado.getId());
@@ -146,16 +173,27 @@ class RepositoriosIntegracionTest {
 
         List<Prestamo> aprobados = prestamoRepository.findByEstadoOrderByFechaSolicitudAsc(EstadoPrestamo.APROBADO);
         assertThat(aprobados).extracting(Prestamo::getId).containsExactly(atrasado.getId(), aprobado.getId());
-        assertThat(aprobados.get(0).getEquipo().getCodigo()).as("EntityGraph carga el equipo").isEqualTo("T-3");
+        assertThat(aprobados.get(0).getEquipo().getCodigo()).as("la referencia carga el equipo").isEqualTo("T-3");
+        assertThat(aprobados.get(0).getUsuario().getNombre()).as("la referencia carga el usuario").isEqualTo("Beto");
 
         assertThat(prestamoRepository.countByEstado(EstadoPrestamo.VENCIDO)).isEqualTo(1);
         assertThat(prestamoRepository.countByEstado(EstadoPrestamo.PENDIENTE)).isEqualTo(1);
     }
 
     @Test
+    void lasFechasSeGuardanYSeLeenSinCorrerseDeDia() {
+        Prestamo guardado = prestamoRepository.save(new Prestamo(ana, nuevoEquipo("F-1"), HOY, HOY.plusDays(7)));
+
+        Prestamo leido = prestamoRepository.findById(guardado.getId()).orElseThrow();
+
+        assertThat(leido.getFechaSolicitud()).isEqualTo(HOY);
+        assertThat(leido.getFechaDevolucionEsperada()).isEqualTo(HOY.plusDays(7));
+    }
+
+    @Test
     void findByRolOrderByNombreAscSoloDevuelveEstudiantesOrdenados() {
-        usuarioRepository.saveAndFlush(new Usuario("Zoe", "zoe@uni.edu.co", "hash", Rol.ESTUDIANTE));
-        usuarioRepository.saveAndFlush(new Usuario("Beto", "beto@uni.edu.co", "hash", Rol.ESTUDIANTE));
+        nuevoEstudiante("Zoe");
+        nuevoEstudiante("Beto");
 
         assertThat(usuarioRepository.findByRolOrderByNombreAsc(Rol.ESTUDIANTE))
                 .extracting(Usuario::getNombre).containsExactly("Ana", "Beto", "Zoe");
@@ -172,108 +210,110 @@ class RepositoriosIntegracionTest {
         Prestamo venceDespues = new Prestamo(ana, nuevoEquipo("R-2"), HOY, HOY.plusDays(2));
         venceDespues.aprobar();
         prestamoRepository.save(venceDespues);
-        // RN01 (V3): Ana ya tiene 2 activos, así que el pendiente es de Beto.
-        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto", "beto@uni.edu.co", "hash", Rol.ESTUDIANTE));
-        prestamoRepository.save(new Prestamo(beto, nuevoEquipo("R-3"), HOY, manana));
-        prestamoRepository.flush();
-        entityManager.clear();
+        prestamoRepository.save(new Prestamo(nuevoEstudiante("Beto"), nuevoEquipo("R-3"), HOY, manana));
 
         List<Prestamo> resultado = prestamoRepository.findByEstadoAndFechaDevolucionEsperada(
                 EstadoPrestamo.APROBADO, manana);
 
         assertThat(resultado).extracting(Prestamo::getId).containsExactly(venceManana.getId());
-        assertThat(resultado.get(0).getUsuario().getNombre()).as("EntityGraph carga el usuario").isEqualTo("Ana");
+        assertThat(resultado.get(0).getUsuario().getNombre()).isEqualTo("Ana");
     }
 
     @Test
     void correoUnicoSinImportarMayusculas() {
-        assertThatThrownBy(() -> usuarioRepository.saveAndFlush(
+        assertThatThrownBy(() -> usuarioRepository.save(
                 new Usuario("Otra Ana", "ANA@UNI.EDU.CO", "hash", Rol.ESTUDIANTE)))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasStackTraceContaining("ux_usuarios_correo");
+                .isInstanceOf(DuplicateKeyException.class)
+                .hasMessageContaining("ux_usuarios_correo");
     }
 
     @Test
     void codigoDeEquipoUnico() {
-        assertThatThrownBy(() -> equipoRepository.saveAndFlush(
+        assertThatThrownBy(() -> equipoRepository.save(
                 new Equipo("PORT-001", "Duplicado", null, CategoriaEquipo.PORTATIL)))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasStackTraceContaining("uk_equipos_codigo");
-    }
-
-    @Test
-    void checkDeSieteDias() {
-        Prestamo prestamo = prestamoRepository.saveAndFlush(new Prestamo(ana, nuevoEquipo("T-5"), HOY, HOY.plusDays(7)));
-
-        assertThatThrownBy(() -> ejecutarSql(
-                "UPDATE prestamos SET fecha_devolucion_esperada = fecha_solicitud + 8 WHERE id = ?", prestamo.getId()))
-                .hasStackTraceContaining("ck_prestamos_duracion");
-    }
-
-    @Test
-    void checkDeMotivoDeRechazo() {
-        Prestamo prestamo = prestamoRepository.saveAndFlush(new Prestamo(ana, nuevoEquipo("T-6"), HOY, HOY));
-
-        assertThatThrownBy(() -> ejecutarSql("UPDATE prestamos SET estado = 'RECHAZADO' WHERE id = ?", prestamo.getId()))
-                .hasStackTraceContaining("ck_prestamos_motivo_rechazo");
+                .isInstanceOf(DuplicateKeyException.class)
+                .hasMessageContaining("uk_equipos_codigo");
     }
 
     @Test
     void indiceUnicoParcialImpideDosPrestamosEnCursoDelMismoEquipo() {
         Equipo equipo = nuevoEquipo("T-7");
-        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto", "beto@uni.edu.co", "hash", Rol.ESTUDIANTE));
         Prestamo primero = prestamoRepository.save(new Prestamo(ana, equipo, HOY, HOY.plusDays(2)));
-        Prestamo segundo = prestamoRepository.saveAndFlush(new Prestamo(beto, equipo, HOY, HOY.plusDays(2)));
+        Prestamo segundo = prestamoRepository.save(new Prestamo(nuevoEstudiante("Beto"), equipo, HOY, HOY.plusDays(2)));
+        // Dos préstamos PENDIENTES del mismo equipo sí pueden convivir: el índice solo mira APROBADO y VENCIDO.
         primero.aprobar();
-        prestamoRepository.saveAndFlush(primero);
+        prestamoRepository.save(primero);
 
-        // Simula la segunda aprobación concurrente, que en la entidad ya habría pasado la guarda.
-        assertThatThrownBy(() -> ejecutarSql("UPDATE prestamos SET estado = 'APROBADO' WHERE id = ?", segundo.getId()))
-                .hasStackTraceContaining("ux_prestamos_equipo_en_curso");
+        // Lo que haría una segunda aprobación simultánea, que en memoria ya pasó la guarda de la entidad
+        // (guardar el préstamo no guarda el equipo, así que en la base de datos el equipo sigue DISPONIBLE).
+        Prestamo copia = prestamoRepository.findById(segundo.getId()).orElseThrow();
+        copia.aprobar();
+        assertThatThrownBy(() -> prestamoRepository.save(copia))
+                .isInstanceOf(DuplicateKeyException.class)
+                .hasMessageContaining("ux_prestamos_equipo_en_curso");
     }
 
     @Test
-    void v3ImpideUnTercerPrestamoActivoAunqueElServicioNoLoHayaContado() {
-        prestamoRepository.save(new Prestamo(ana, nuevoEquipo("V-1"), HOY, HOY.plusDays(1)));
-        Prestamo aprobado = new Prestamo(ana, nuevoEquipo("V-2"), HOY, HOY.plusDays(1));
-        aprobado.aprobar();
-        prestamoRepository.saveAndFlush(aprobado);
+    void guardarSiEstadoSoloEscribeSiElDocumentoSigueEnElEstadoDeOrigen() {
+        Prestamo guardado = prestamoRepository.save(new Prestamo(ana, nuevoEquipo("V-7"), HOY, HOY.plusDays(1)));
+        Prestamo paraRechazar = prestamoRepository.findById(guardado.getId()).orElseThrow();
+        Prestamo paraAprobar = prestamoRepository.findById(guardado.getId()).orElseThrow();
 
-        assertThatThrownBy(() -> prestamoRepository.saveAndFlush(
-                new Prestamo(ana, nuevoEquipo("V-3"), HOY, HOY.plusDays(1))))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasStackTraceContaining("ck_prestamos_rn01");
+        paraRechazar.rechazar("Sin cupo");
+        assertThat(operaciones.guardarSiEstado(paraRechazar, EstadoPrestamo.PENDIENTE)).isTrue();
+
+        // Un aprobar() simultáneo que leyó el préstamo cuando aún estaba PENDIENTE: ya no escribe nada.
+        paraAprobar.aprobar();
+        assertThat(operaciones.guardarSiEstado(paraAprobar, EstadoPrestamo.PENDIENTE)).isFalse();
+        assertThat(prestamoRepository.findById(guardado.getId())).get()
+                .extracting(Prestamo::getEstado).isEqualTo(EstadoPrestamo.RECHAZADO);
     }
 
     @Test
-    void v3PermiteNuevasSolicitudesCuandoLosPrestamosYaNoEstanActivos() {
-        Prestamo rechazado = new Prestamo(ana, nuevoEquipo("V-4"), HOY, HOY.plusDays(1));
-        rechazado.rechazar("Sin cupo");
-        prestamoRepository.save(rechazado);
-        prestamoRepository.save(new Prestamo(ana, nuevoEquipo("V-5"), HOY, HOY.plusDays(1)));
+    void guardarSiDisponibleNoTomaUnEquipoDesactivadoOPrestado() {
+        Equipo equipo = nuevoEquipo("V-8");
+        Equipo copia = equipoRepository.findById(equipo.getId()).orElseThrow();
+        equipo.desactivar();
+        equipoRepository.save(equipo);
 
-        Prestamo segundo = prestamoRepository.saveAndFlush(new Prestamo(ana, nuevoEquipo("V-6"), HOY, HOY.plusDays(1)));
-
-        assertThat(segundo.getId()).isNotNull();
+        copia.marcarPrestado();
+        assertThat(operaciones.guardarSiDisponible(copia)).isFalse();
+        assertThat(equipoRepository.findById(equipo.getId())).get()
+                .satisfies(e -> {
+                    assertThat(e.isActivo()).isFalse();
+                    assertThat(e.getEstado()).isEqualTo(EstadoEquipo.DISPONIBLE);
+                });
     }
 
     @Test
-    void v3SoloPermiteLasTransicionesDeD5() {
-        Prestamo prestamo = prestamoRepository.saveAndFlush(new Prestamo(ana, nuevoEquipo("V-7"), HOY, HOY.plusDays(1)));
-        ejecutarSql("UPDATE prestamos SET estado = 'RECHAZADO', motivo_rechazo = 'x' WHERE id = ?", prestamo.getId());
+    void elCandadoDejaPasarDeAUnaPeticionYSeLiberaAunqueLaAccionFalle() throws Exception {
+        AtomicInteger dentro = new AtomicInteger();
+        AtomicInteger maximo = new AtomicInteger();
+        ExecutorService hilos = Executors.newFixedThreadPool(6);
+        try {
+            List<Future<?>> tareas = new ArrayList<>();
+            for (int i = 0; i < 6; i++) {
+                tareas.add(hilos.submit(() -> operaciones.conCandado("prueba", IllegalStateException::new, () -> {
+                    maximo.accumulateAndGet(dentro.incrementAndGet(), Math::max);
+                    try {
+                        Thread.sleep(40);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return dentro.decrementAndGet();
+                })));
+            }
+            for (Future<?> tarea : tareas) {
+                tarea.get(30, TimeUnit.SECONDS);
+            }
+        } finally {
+            hilos.shutdownNow();
+        }
+        assertThat(maximo.get()).as("nunca hubo dos peticiones a la vez dentro del candado").isEqualTo(1);
 
-        // Lo que haría un aprobar() simultáneo que leyó el préstamo cuando aún estaba PENDIENTE.
-        assertThatThrownBy(() -> ejecutarSql("UPDATE prestamos SET estado = 'APROBADO' WHERE id = ?", prestamo.getId()))
-                .hasStackTraceContaining("ck_prestamos_transicion");
-    }
-
-    @Test
-    void v3TampocoPermiteRepetirLaMismaTransicion() {
-        Prestamo prestamo = prestamoRepository.saveAndFlush(new Prestamo(ana, nuevoEquipo("V-8"), HOY, HOY.plusDays(1)));
-        ejecutarSql("UPDATE prestamos SET estado = 'RECHAZADO', motivo_rechazo = 'x' WHERE id = ?", prestamo.getId());
-
-        // Lo que haría un segundo rechazar() simultáneo sobre el mismo préstamo.
-        assertThatThrownBy(() -> ejecutarSql("UPDATE prestamos SET estado = 'RECHAZADO' WHERE id = ?", prestamo.getId()))
-                .hasStackTraceContaining("ck_prestamos_transicion");
+        assertThatThrownBy(() -> operaciones.conCandado("prueba", IllegalStateException::new, () -> {
+            throw new IllegalArgumentException("falla la acción");
+        })).isInstanceOf(IllegalArgumentException.class);
+        assertThat(operaciones.conCandado("prueba", IllegalStateException::new, () -> "libre")).isEqualTo("libre");
     }
 }

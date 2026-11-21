@@ -1,23 +1,17 @@
 # Configuración de PrestaLab (API REST).
 # Los valores de conexión y el secreto JWT llegan por variables de entorno (D8), que Spring Boot enlaza solas:
-#   SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD,
+#   SPRING_DATA_MONGODB_URI,
 #   SPRING_MAIL_HOST, SPRING_MAIL_PORT, PRESTALAB_JWT_SECRET
 # Los valores de este archivo son solo los predeterminados para desarrollo local; aquí no hay secretos.
 spring:
   application:
     name: prestalab
-  datasource:
-    url: jdbc:postgresql://localhost:5432/prestalab
-  jpa:
-    open-in-view: false
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
-  flyway:
-    enabled: true
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/prestalab
+      # Crea al arrancar los índices declarados en las entidades: ux_usuarios_correo, uk_equipos_codigo,
+      # ux_prestamos_equipo_en_curso (único parcial) y los de consulta.
+      auto-index-creation: true
   mail:
     host: localhost
     port: 1025
@@ -47,16 +41,6 @@ server:
     include-exception: false
     whitelabel:
       enabled: false
-
-springdoc:
-  api-docs:
-    # En producción se puede apagar con SPRINGDOC_API_DOCS_ENABLED=false (D8: Swagger desactivado o protegido).
-    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
-  swagger-ui:
-    path: /swagger-ui.html
-    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
-    tags-sorter: alpha
-    operations-sorter: alpha
 
 prestalab:
   jwt:

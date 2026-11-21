@@ -20,18 +20,17 @@ La corrida necesita los tres contenedores de D8. La carpeta 09 consulta Mailpit 
 
 ### Sin Docker (Windows)
 
-También se puede correr con PostgreSQL 16 y Mailpit instalados en la máquina:
+También se puede correr con MongoDB 7 y Mailpit instalados en la máquina:
 
 ```bash
 winget install --id axllent.mailpit -e     # una sola vez
 mailpit --smtp 0.0.0.0:1025 --listen 0.0.0.0:8025
 ```
 
-En otra consola, con PostgreSQL corriendo y una base `prestalab` creada:
+En otra consola, con MongoDB corriendo en el puerto 27017 (la base `prestalab` y sus índices se crean solos):
 
 ```bash
-SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/prestalab \
-SPRING_DATASOURCE_USERNAME=prestalab SPRING_DATASOURCE_PASSWORD=tu-clave \
+SPRING_DATA_MONGODB_URI=mongodb://localhost:27017/prestalab \
 PRESTALAB_JWT_SECRET="$(openssl rand -base64 48)" \
 java -jar target/prestalab.jar
 ```
@@ -56,13 +55,13 @@ npx newman run postman/PrestaLab-API.postman_collection.json \
 ```
 
 En GitHub Actions lo hace el job `e2e-postman` de `.github/workflows/ci.yml`: levanta `docker compose`, espera a
-`/v3/api-docs`, ejecuta Newman, publica `resultado.xml` como artefacto y siempre apaga los contenedores.
+que el login del administrador responda, ejecuta Newman, publica `resultado.xml` como artefacto y siempre apaga los contenedores.
 
 ## Qué cubre cada carpeta
 
 | Carpeta | Cubre |
 |---|---|
-| 00 Configuración | Genera las variables de la corrida (fechas en America/Bogota). Verifica que `/v3/api-docs` documente los 19 endpoints y `bearerAuth`, y que Swagger UI sea público. |
+| 00 Configuración | Genera las variables de la corrida (fechas en America/Bogota). Verifica que la API ya no publica el contrato OpenAPI (`/v3/api-docs`) ni Swagger UI: ambas rutas responden 401 como cualquier ruta protegida (ADR 0008). |
 | 01 Seguridad sin token | 401 `NO_AUTENTICADO` sin token, con la firma alterada y en una ruta inexistente. |
 | 02 Autenticación del administrador | RF01: mensaje uniforme ante credenciales inválidas, 400 `VALIDACION` y claims del JWT (`iss`, `sub`, `rol`, `exp - iat = 3600`). |
 | 03 Administrador: equipos | RF02 y RN07: crear (201 + `Location`), duplicado (422), validación (400), enum inválido y propiedad desconocida (400), editar, cambiar estado (204), PRESTADO a mano (422), 404, 400 y `DELETE` → 405. |
@@ -94,13 +93,14 @@ HTTP no permite probar estas reglas sin crear rutas especiales, y la API no las 
 | RF11: recordatorio a las 08:00 | Es una tarea programada | `PrestamoServiceImplTest` (`enviarRecordatorios`), `RecordatorioSchedulerTest`, `EmailNotificadorTest` |
 | RN04: con un préstamo VENCIDO no se solicita | Exige que pase el tiempo | `PrestamoServiceImplTest.Solicitar.rn04ConUnPrestamoVencido`, `RepositoriosIntegracionTest` |
 
-## Probar a mano desde Swagger UI
+## Probar a mano una petición suelta
 
-1. Abre `http://localhost:8080/swagger-ui.html`.
-2. En **Autenticación → POST /api/v1/auth/login**, pulsa **Try it out** y envía:
-   `{"correo": "admin@prestalab.local", "password": "Admin123*"}`.
-3. Copia el valor de `token` de la respuesta.
-4. Pulsa **Authorize** (arriba a la derecha), pega el token (sin escribir `Bearer`) y confirma.
-5. Ya puedes llamar a los endpoints protegidos. El token vence a los 60 minutos; después hay que iniciar sesión otra vez.
+La API no tiene Swagger UI (ADR 0008); esta colección es su documentación ejecutable.
+
+1. Ejecuta **00.01** (prepara las variables) y después **02.04 Login del administrador**: su script guarda el
+   token en la variable `token`.
+2. Abre cualquier otra petición y pulsa **Send**: la colección envía el token sola como `Authorization: Bearer`.
+3. Para ver un cuerpo de ejemplo, abre la pestaña **Body** de la petición; las pruebas de la pestaña **Tests**
+   describen la respuesta esperada. El token vence a los 60 minutos; después hay que iniciar sesión otra vez.
 
 > Las credenciales del administrador son solo de desarrollo. Cámbialas antes de cualquier despliegue real.

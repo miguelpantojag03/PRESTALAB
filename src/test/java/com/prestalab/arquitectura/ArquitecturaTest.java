@@ -75,8 +75,10 @@ class ArquitecturaTest {
 
     @ArchTest
     static final ArchRule dominioSinSpring = classes().that().resideInAPackage("com.prestalab.domain..")
-            .should().onlyDependOnClassesThat().resideInAnyPackage("java..", "jakarta.persistence..", "com.prestalab.domain..")
-            .as("domain no depende de Spring ni de otro paquete de la app (solo jakarta.persistence)");
+            .should().onlyDependOnClassesThat().resideInAnyPackage("java..", "org.springframework.data.annotation..",
+                    "org.springframework.data.mongodb.core.mapping..", "org.springframework.data.mongodb.core.index..",
+                    "com.prestalab.domain..")
+            .as("domain no depende de otro paquete de la app; de Spring solo usa las anotaciones de mapeo de MongoDB");
 
     @ArchTest
     static final ArchRule controllerSinRepositorioNiModeloNiExcepciones = noClasses()
@@ -132,7 +134,10 @@ class ArquitecturaTest {
         };
     }
 
-    /** Lista blanca: no existe ninguna clase fuera de las del diccionario canónico (sección 3). */
+    /**
+     * Lista blanca: no existe ninguna clase fuera de las del diccionario canónico (sección 3), más las tres que
+     * trajo MongoDB (ADR 0008): GeneradorIds, OperacionesAtomicas y DatosIniciales.
+     */
     @Test
     void soloExistenLasClasesDelDiccionario() {
         JavaClasses importadas = new ClassFileImporter()
@@ -159,6 +164,8 @@ class ArquitecturaTest {
                 "com.prestalab.repository.UsuarioRepository",
                 "com.prestalab.repository.EquipoRepository",
                 "com.prestalab.repository.PrestamoRepository",
+                "com.prestalab.repository.GeneradorIds",
+                "com.prestalab.repository.OperacionesAtomicas",
                 "com.prestalab.dto.RegistroUsuarioDTO",
                 "com.prestalab.dto.LoginDTO",
                 "com.prestalab.dto.TokenDTO",
@@ -183,6 +190,7 @@ class ArquitecturaTest {
                 "com.prestalab.service.PrestamoServiceImpl",
                 "com.prestalab.service.DashboardService",
                 "com.prestalab.service.DashboardServiceImpl",
+                "com.prestalab.service.DatosIniciales",
                 "com.prestalab.scheduler.VencimientoScheduler",
                 "com.prestalab.scheduler.RecordatorioScheduler",
                 "com.prestalab.config.SecurityConfig",

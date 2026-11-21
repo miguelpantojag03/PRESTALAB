@@ -86,13 +86,16 @@ jobs:
           sed -i '/^PRESTALAB_JWT_SECRET=/d' .env
           echo "PRESTALAB_JWT_SECRET=$(openssl rand -base64 48)" >> .env
 
-      - name: Levantar prestalab-web, prestalab-app, prestalab-db y prestalab-mail
+      - name: Levantar prestalab-web, prestalab-app, prestalab-db (MongoDB) y prestalab-mail
         run: docker compose up -d --build
 
       - name: Esperar a que la API responda (máximo 120 s)
         run: |
           for i in $(seq 1 60); do
-            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/v3/api-docs)" = "200" ]; then
+            # El login del administrador responde 200 cuando la API arrancó, se conectó a MongoDB y sembró los datos.
+            estado=$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+              -d '{"correo":"admin@prestalab.local","password":"Admin123*"}' http://localhost:8080/api/v1/auth/login)
+            if [ "$estado" = "200" ]; then
               echo "API lista tras $((i * 2)) s"
               exit 0
             fi

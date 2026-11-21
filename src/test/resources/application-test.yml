@@ -1,4 +1,4 @@
-# Perfil de pruebas. La conexión a PostgreSQL la inyecta Testcontainers con @DynamicPropertySource.
+# Perfil de pruebas. La conexión a MongoDB la inyecta Testcontainers con @DynamicPropertySource.
 spring:
   mail:
     host: localhost
