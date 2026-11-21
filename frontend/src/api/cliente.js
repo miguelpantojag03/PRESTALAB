@@ -47,7 +47,18 @@ export async function solicitar(metodo, ruta, cuerpo) {
     return null;
   }
   const texto = await respuesta.text();
-  const datos = texto ? JSON.parse(texto) : null;
+  let datos = null;
+  if (texto) {
+    try {
+      datos = JSON.parse(texto);
+    } catch {
+      // Un cuerpo que no es JSON (por ejemplo, la página HTML del 502 de nginx mientras el backend arranca)
+      // no debe convertirse en un SyntaxError: se informa como un error de la API sin detalle.
+      if (respuesta.ok) {
+        throw new ErrorApi(respuesta.status, { detail: 'El servidor respondió en un formato inesperado' });
+      }
+    }
+  }
   if (!respuesta.ok) {
     const error = new ErrorApi(respuesta.status, datos);
     // Un 401 fuera del login significa que el token venció o es inválido: se cierra la sesión.

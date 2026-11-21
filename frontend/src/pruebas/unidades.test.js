@@ -101,6 +101,19 @@ describe('cliente de la API', () => {
     expect(fetchFalso.mock.calls[2][0]).toBe('/api/v1/equipos?soloDisponibles=false');
   });
 
+  it('convierte en ErrorApi una respuesta de error que no es JSON (502 de nginx)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response('<html><body>502 Bad Gateway</body></html>', { status: 502 })));
+    configurarCliente({ token: () => 't', noAutenticado: () => {} });
+
+    const error = await api.resumen().catch((e) => e);
+
+    expect(error).toBeInstanceOf(ErrorApi);
+    expect(error.estado).toBe(502);
+    expect(error.codigo).toBe('ERROR_INTERNO');
+    expect(error.message).toBe('No se pudo completar la operación');
+  });
+
   it('informa la falta de conexión con un mensaje claro', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
     const error = await api.resumen().catch((e) => e);

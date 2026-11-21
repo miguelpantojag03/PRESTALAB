@@ -116,6 +116,7 @@ export function Registro() {
   const { sesion, iniciarSesion } = useSesion();
   const navegar = useNavigate();
   const [datos, setDatos] = useState({ nombre: '', correo: '', password: '' });
+  const [registrada, setRegistrada] = useState(null);
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -141,7 +142,12 @@ export function Registro() {
     setEnviando(true);
     setError(null);
     try {
-      await api.registrar(datos);
+      // Si la cuenta ya se creó y lo que falló fue el inicio de sesión, el reintento no vuelve a registrarla
+      // (eso respondería "Ya existe una cuenta con ese correo").
+      if (registrada?.correo !== datos.correo || registrada?.password !== datos.password) {
+        await api.registrar(datos);
+        setRegistrada({ correo: datos.correo, password: datos.password });
+      }
       const nueva = await iniciarSesion(datos.correo, datos.password);
       navegar(inicioSegunRol(nueva.rol), { replace: true });
     } catch (e) {
