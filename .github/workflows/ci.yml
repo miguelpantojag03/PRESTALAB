@@ -93,8 +93,9 @@ jobs:
         run: |
           for i in $(seq 1 60); do
             # El login del administrador responde 200 cuando la API arrancó, se conectó a MongoDB y sembró los datos.
+            # "|| true": mientras la API arranca, curl falla al conectar y bash -e no debe cortar la espera.
             estado=$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
-              -d '{"correo":"admin@prestalab.local","password":"Admin123*"}' http://localhost:8080/api/v1/auth/login)
+              -d '{"correo":"admin@prestalab.local","password":"Admin123*"}' http://localhost:8080/api/v1/auth/login || true)
             if [ "$estado" = "200" ]; then
               echo "API lista tras $((i * 2)) s"
               exit 0
