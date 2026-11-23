@@ -36,6 +36,14 @@ export const IconoMenu = () => (
   <svg {...base}><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" /></svg>
 );
 
+export const IconoOjo = () => (
+  <svg {...base}><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" /><circle cx="8" cy="8" r="2" /></svg>
+);
+
+export const IconoOjoTachado = () => (
+  <svg {...base}><path d="M6.6 3.7A6.6 6.6 0 0 1 8 3.5c4 0 6.5 4.5 6.5 4.5a11 11 0 0 1-1.9 2.4M10.1 11.9a6 6 0 0 1-2.1.6C4 12.5 1.5 8 1.5 8a11 11 0 0 1 2.6-3.1" /><path d="M6.6 6.6a2 2 0 0 0 2.8 2.8M2 2l12 12" /></svg>
+);
+
 export const IconoInfo = () => (
   <svg {...base}><circle cx="8" cy="8" r="6" /><path d="M8 7.2v3.6M8 5.2v.1" /></svg>
 );

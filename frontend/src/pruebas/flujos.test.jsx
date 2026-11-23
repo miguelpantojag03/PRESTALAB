@@ -92,6 +92,22 @@ describe('flujos de la interfaz', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('Correo o contraseña incorrectos');
   });
 
+  it('el botón del ojo muestra y oculta la contraseña sin perder lo escrito', async () => {
+    simularApi({});
+    montar('/login');
+
+    const campo = screen.getByLabelText('Contraseña');
+    await userEvent.type(campo, 'Admin123*');
+    expect(campo.type).toBe('password');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mostrar contraseña' }));
+    expect(campo.type).toBe('text');
+    expect(campo.value).toBe('Admin123*');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }));
+    expect(campo.type).toBe('password');
+  });
+
   it('un estudiante no entra a las pantallas del administrador', async () => {
     sessionStorage.setItem('prestalab.token', TOKEN_ESTUDIANTE);
     simularApi({ 'GET /api/v1/equipos': [200, [EQUIPO]], 'GET /api/v1/prestamos/mios': [200, []] });

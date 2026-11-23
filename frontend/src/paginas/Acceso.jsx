@@ -4,10 +4,28 @@ import { useAnimate } from 'motion/react';
 import { api } from '../api/cliente.js';
 import { useSesion } from '../auth/Sesion.jsx';
 import { Alerta } from '../componentes/Comunes.jsx';
-import { Marca } from '../componentes/Iconos.jsx';
+import { IconoOjo, IconoOjoTachado, Marca } from '../componentes/Iconos.jsx';
 import { inicioSegunRol } from '../componentes/Plantilla.jsx';
 
 const MAXIMO_BYTES_PASSWORD = 72;
+
+/**
+ * Campo de contraseña con un botón para verla mientras se escribe: así se nota si falta un carácter difícil de
+ * teclear, como el * de Admin123*. Recibe las mismas props que el input.
+ */
+function CampoPassword(props) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="entrada-con-boton">
+      <input {...props} className="entrada" type={visible ? 'text' : 'password'} />
+      <button type="button" className="boton-ojo" onClick={() => setVisible(!visible)} aria-pressed={visible}
+              aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              title={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+        {visible ? <IconoOjoTachado /> : <IconoOjo />}
+      </button>
+    </div>
+  );
+}
 
 /**
  * Sacudida horizontal, como el inicio de sesión de macOS: la causa (credenciales rechazadas) es evidente y el
@@ -97,8 +115,8 @@ export function IniciarSesion() {
         </div>
         <div className="campo">
           <label htmlFor="login-password">Contraseña</label>
-          <input id="login-password" className="entrada" type="password" value={password}
-                 onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+          <CampoPassword id="login-password" value={password}
+                         onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
         </div>
         <button type="submit" className="boton primario" disabled={enviando}>
           {enviando ? 'Entrando…' : 'Entrar'}
@@ -173,10 +191,9 @@ export function Registro() {
         {/* La ayuda va fuera del label: así el nombre accesible del campo es solo "Contraseña". */}
         <div className="campo">
           <label htmlFor="registro-password">Contraseña</label>
-          <input id="registro-password" className="entrada" type="password" value={datos.password}
-                 onChange={cambiar('password')}
-                 minLength={8} maxLength={72} autoComplete="new-password" required aria-describedby="ayuda-password"
-                 aria-invalid={avisoPassword.tipo === 'invalido'} />
+          <CampoPassword id="registro-password" value={datos.password} onChange={cambiar('password')}
+                         minLength={8} maxLength={72} autoComplete="new-password" required
+                         aria-describedby="ayuda-password" aria-invalid={avisoPassword.tipo === 'invalido'} />
           <small id="ayuda-password" className={`ayuda ayuda-${avisoPassword.tipo}`} aria-live="polite">
             {avisoPassword.texto}
           </small>
