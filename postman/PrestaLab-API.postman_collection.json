@@ -142,13 +142,13 @@
           "    pm.expect(texto).to.not.include('passwordHash');",
           "});",
           "pm.test('[global] Ninguna respuesta contiene las contraseñas usadas en la corrida', function () {",
-          "    [pm.environment.get('adminPassword'), pm.collectionVariables.get('estudiantePassword')]",
+          "    [pm.variables.get('adminPassword'), pm.collectionVariables.get('estudiantePassword')]",
           "        .filter(function (valor) { return !!valor; })",
           "        .forEach(function (valor) { pm.expect(texto, 'contraseña en claro').to.not.include(valor); });",
           "});",
           "// Solo las respuestas de la API de PrestaLab (no las de Mailpit); la URL puede venir resuelta o no.",
           "const url = pm.request.url.toString();",
-          "const baseUrl = pm.environment.get('baseUrl') || '';",
+          "const baseUrl = pm.variables.get('baseUrl') || '';",
           "const esApi = (baseUrl && url.indexOf(baseUrl) === 0) || url.indexOf('{{baseUrl}}') === 0;",
           "if (codigoHttp >= 200 && codigoHttp < 300 && texto && esApi) {",
           "    pm.test('[global] Los DTO de éxito no tienen una propiedad password', function () {",
@@ -167,6 +167,31 @@
     }
   ],
   "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "rootUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "mailpitUrl",
+      "value": "http://localhost:8025",
+      "type": "string"
+    },
+    {
+      "key": "adminCorreo",
+      "value": "admin@prestalab.local",
+      "type": "string"
+    },
+    {
+      "key": "adminPassword",
+      "value": "Admin123*",
+      "type": "string"
+    },
     {
       "key": "ts",
       "value": "",

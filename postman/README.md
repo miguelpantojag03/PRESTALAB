@@ -37,10 +37,14 @@ java -jar target/prestalab.jar
 
 ## Ejecutar en Postman (Collection Runner)
 
-1. En Postman, usa **Import** y elige los dos archivos JSON de esta carpeta.
-2. Arriba a la derecha, selecciona el entorno **PrestaLab API (local)**.
-3. Abre la colección **PrestaLab API**, pulsa **Run** y ejecútala **completa y en orden**, sin cambiar el orden
-   de las carpetas.
+1. Levanta los contenedores (`docker compose up -d` o `levantar-prestalab.bat`).
+2. En Postman, usa **Import** y elige los dos archivos JSON de esta carpeta. Si ya la habías importado antes,
+   reemplázala por la versión actual.
+3. Arriba a la derecha, selecciona el entorno **PrestaLab API (local)**. Es opcional: la colección trae los mismos
+   valores por defecto (`baseUrl`, `rootUrl`, `mailpitUrl`, `adminCorreo` y `adminPassword`), así que también corre
+   con "No environment". Si eliges otro entorno, sus valores reemplazan a los de la colección.
+4. Abre la colección **PrestaLab API**, pulsa **Run** y ejecútala **completa y en orden**, sin cambiar el orden
+   de las carpetas. Una petición suelta puede fallar si depende de variables que crea una anterior (token, ids).
 
 Cada corrida genera su propio estudiante (`pm.est.{ts}@prestalab.test`) y su propio equipo (`PM-{ts}`).
 Por eso se puede repetir sin límite y dos corridas seguidas dan el mismo resultado. Al terminar, el equipo queda
