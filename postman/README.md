@@ -44,7 +44,18 @@ java -jar target/prestalab.jar
    valores por defecto (`baseUrl`, `rootUrl`, `mailpitUrl`, `adminCorreo` y `adminPassword`), así que también corre
    con "No environment". Si eliges otro entorno, sus valores reemplazan a los de la colección.
 4. Abre la colección **PrestaLab API**, pulsa **Run** y ejecútala **completa y en orden**, sin cambiar el orden
-   de las carpetas. Una petición suelta puede fallar si depende de variables que crea una anterior (token, ids).
+   de las carpetas.
+
+### Peticiones sueltas (Send)
+
+Cada carpeta inicia sesión sola cuando su token falta o venció (`_autoLogin`, definido en el script de la colección):
+las carpetas de administrador entran con `adminCorreo`/`adminPassword`, y las de estudiante entran con el estudiante
+de la corrida o, si la colección nunca corrió, registran uno nuevo. La consola de Postman muestra
+"Login automático como …". En una corrida completa los tokens ya existen y no hace nada.
+
+El login automático solo resuelve el token. Una petición que necesita un id creado por otra (`equipoId`,
+`prestamo1Id`, `estudianteId`…) se omite con el aviso "Se omite …: falta …", y los tests que esperan un estado
+concreto (por ejemplo, aprobar un préstamo PENDIENTE) fallan si se corren fuera de orden: eso es lo que verifican.
 
 Cada corrida genera su propio estudiante (`pm.est.{ts}@prestalab.test`) y su propio equipo (`PM-{ts}`).
 Por eso se puede repetir sin límite y dos corridas seguidas dan el mismo resultado. Al terminar, el equipo queda

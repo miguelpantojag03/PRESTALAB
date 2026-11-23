@@ -103,7 +103,92 @@
           "        }",
           "    };",
           "};",
-          "pm.collectionVariables.set('_helpers', '(' + helpers.toString() + ')');"
+          "pm.collectionVariables.set('_helpers', '(' + helpers.toString() + ')');",
+          "",
+          "// Login automático para correr peticiones sueltas (Send) sin ejecutar antes toda la colección.",
+          "// Cada carpeta lo llama con su rol. Solo actúa si la petición lleva token y el de ese rol falta o venció;",
+          "// en una corrida completa los tokens ya existen y no hace nada, así que el flujo E2E no cambia.",
+          "const autoLogin = function (pm, rol) {",
+          "    const CryptoJS = require('crypto-js');",
+          "    const clave = rol === 'ADMIN' ? 'tokenAdmin' : 'tokenEstudiante';",
+          "    const variables = pm.collectionVariables;",
+          "    const usarToken = function () { variables.set('token', variables.get(clave) || ''); };",
+          "    const payload = function (token) {",
+          "        try {",
+          "            let b64 = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+          "            while (b64.length % 4) { b64 += '='; }",
+          "            return JSON.parse(CryptoJS.enc.Base64.parse(b64).toString(CryptoJS.enc.Utf8));",
+          "        } catch (e) {",
+          "            return null;",
+          "        }",
+          "    };",
+          "    const vigente = function (token) {",
+          "        const p = token ? payload(token) : null;",
+          "        return !!p && typeof p.exp === 'number' && p.exp * 1000 > Date.now() + 60000;",
+          "    };",
+          "    if ((pm.request.auth && pm.request.auth.type === 'noauth') || vigente(variables.get(clave))) {",
+          "        usarToken();",
+          "        return;",
+          "    }",
+          "    const baseUrl = pm.variables.get('baseUrl');",
+          "    const enviar = function (ruta, cuerpo, alResponder) {",
+          "        pm.sendRequest({",
+          "            url: baseUrl + ruta,",
+          "            method: 'POST',",
+          "            header: { 'Content-Type': 'application/json' },",
+          "            body: { mode: 'raw', raw: JSON.stringify(cuerpo) }",
+          "        }, alResponder);",
+          "    };",
+          "    const iniciarSesion = function (correo, password, idVariable) {",
+          "        enviar('/auth/login', { correo: correo, password: password }, function (error, respuesta) {",
+          "            if (!error && respuesta.code === 200) {",
+          "                const token = respuesta.json().token;",
+          "                variables.set(clave, token);",
+          "                if (!variables.get(idVariable)) { variables.set(idVariable, String(payload(token).sub)); }",
+          "                console.info('Login automático como ' + rol + ' (' + correo + ').');",
+          "            } else {",
+          "                console.warn('No se pudo iniciar sesión como ' + rol + ' (' + correo + '): ' +",
+          "                    (error ? error.message : 'HTTP ' + respuesta.code) + '.');",
+          "            }",
+          "            usarToken();",
+          "        });",
+          "    };",
+          "    if (rol === 'ADMIN') {",
+          "        iniciarSesion(pm.variables.get('adminCorreo'), pm.variables.get('adminPassword'), 'adminId');",
+          "        return;",
+          "    }",
+          "    // Estudiante: si la colección nunca corrió, se crean los datos de la corrida (como en 00.01) y se registra.",
+          "    if (!variables.get('estudianteCorreo')) {",
+          "        const ts = Date.now();",
+          "        const fechaBogota = function (dias) {",
+          "            return new Date(ts - 5 * 3600 * 1000 + dias * 86400000).toISOString().slice(0, 10);",
+          "        };",
+          "        variables.set('ts', String(ts));",
+          "        variables.set('estudianteCorreo', 'pm.est.' + ts + '@prestalab.test');",
+          "        variables.set('estudiantePassword', 'Prueba123*');",
+          "        variables.set('estudianteNombre', 'Estudiante Postman ' + ts);",
+          "        variables.set('equipoCodigo', 'PM-' + ts);",
+          "        variables.set('fechaHoy', fechaBogota(0));",
+          "        variables.set('fechaMas3', fechaBogota(3));",
+          "        variables.set('fechaMas8', fechaBogota(8));",
+          "        variables.set('fechaAyer', fechaBogota(-1));",
+          "    }",
+          "    const correo = variables.get('estudianteCorreo');",
+          "    const password = variables.get('estudiantePassword');",
+          "    if (variables.get('estudianteId')) {",
+          "        iniciarSesion(correo, password, 'estudianteId');",
+          "        return;",
+          "    }",
+          "    const registro = { nombre: variables.get('estudianteNombre'), correo: correo, password: password };",
+          "    enviar('/auth/registro', registro, function (error, respuesta) {",
+          "        if (!error && respuesta.code === 201) {",
+          "            variables.set('estudianteId', String(respuesta.json().id));",
+          "            console.info('Registro automático del estudiante ' + correo + '.');",
+          "        }",
+          "        iniciarSesion(correo, password, 'estudianteId');",
+          "    });",
+          "};",
+          "pm.collectionVariables.set('_autoLogin', '(' + autoLogin.toString() + ')');"
         ]
       }
     },
@@ -323,6 +408,11 @@
       "value": "",
       "type": "string",
       "description": "Fuente de los helpers; la escribe el script previo de la colección."
+    },
+    {
+      "key": "_autoLogin",
+      "value": "",
+      "type": "string"
     },
     {
       "key": "esquemaEquipoDTO",
@@ -1823,7 +1913,8 @@
             "type": "text/javascript",
             "exec": [
               "// Token de esta carpeta; la autenticación de la colección envía Authorization: Bearer {{token}}.",
-              "pm.collectionVariables.set('token', pm.collectionVariables.get('tokenAdmin') || '');"
+              "// Si la petición se corre sola y falta el token (o venció), _autoLogin inicia sesión antes de enviarla.",
+              "eval(pm.collectionVariables.get('_autoLogin'))(pm, 'ADMIN');"
             ]
           }
         }
@@ -3012,7 +3103,8 @@
             "type": "text/javascript",
             "exec": [
               "// Token de esta carpeta; la autenticación de la colección envía Authorization: Bearer {{token}}.",
-              "pm.collectionVariables.set('token', pm.collectionVariables.get('tokenEstudiante') || '');"
+              "// Si la petición se corre sola y falta el token (o venció), _autoLogin inicia sesión antes de enviarla.",
+              "eval(pm.collectionVariables.get('_autoLogin'))(pm, 'ESTUDIANTE');"
             ]
           }
         }
@@ -4229,7 +4321,8 @@
             "type": "text/javascript",
             "exec": [
               "// Token de esta carpeta; la autenticación de la colección envía Authorization: Bearer {{token}}.",
-              "pm.collectionVariables.set('token', pm.collectionVariables.get('tokenAdmin') || '');"
+              "// Si la petición se corre sola y falta el token (o venció), _autoLogin inicia sesión antes de enviarla.",
+              "eval(pm.collectionVariables.get('_autoLogin'))(pm, 'ADMIN');"
             ]
           }
         }
@@ -4371,7 +4464,8 @@
             "type": "text/javascript",
             "exec": [
               "// Token de esta carpeta; la autenticación de la colección envía Authorization: Bearer {{token}}.",
-              "pm.collectionVariables.set('token', pm.collectionVariables.get('tokenEstudiante') || '');"
+              "// Si la petición se corre sola y falta el token (o venció), _autoLogin inicia sesión antes de enviarla.",
+              "eval(pm.collectionVariables.get('_autoLogin'))(pm, 'ESTUDIANTE');"
             ]
           }
         }
@@ -4593,7 +4687,8 @@
             "type": "text/javascript",
             "exec": [
               "// Token de esta carpeta; la autenticación de la colección envía Authorization: Bearer {{token}}.",
-              "pm.collectionVariables.set('token', pm.collectionVariables.get('tokenAdmin') || '');"
+              "// Si la petición se corre sola y falta el token (o venció), _autoLogin inicia sesión antes de enviarla.",
+              "eval(pm.collectionVariables.get('_autoLogin'))(pm, 'ADMIN');"
             ]
           }
         }
@@ -4740,7 +4835,8 @@
             "type": "text/javascript",
             "exec": [
               "// Token de esta carpeta; la autenticación de la colección envía Authorization: Bearer {{token}}.",
-              "pm.collectionVariables.set('token', pm.collectionVariables.get('tokenEstudiante') || '');"
+              "// Si la petición se corre sola y falta el token (o venció), _autoLogin inicia sesión antes de enviarla.",
+              "eval(pm.collectionVariables.get('_autoLogin'))(pm, 'ESTUDIANTE');"
             ]
           }
         }
