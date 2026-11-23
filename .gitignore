@@ -22,3 +22,8 @@ frontend/dist/
 
 # Archivos de trabajo de tasteskill (capturas del inspector y notas)
 .taste-skill/
+
+# Respaldos y bloqueos de Visual Paradigm
+*.vpp.bak_*
+*.vpp.lck
+docs/diagramas/respaldo/

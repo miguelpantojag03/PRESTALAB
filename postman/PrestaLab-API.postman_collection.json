@@ -498,8 +498,13 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// JWT fijo con formato válido; se cambia su último carácter para alterar la firma.",
-                  "const fijo = 'eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJwcmVzdGFsYWIiLCJzdWIiOiIxIiwicm9sIjoiQURNSU4iLCJleHAiOjQxMDI0NDQ4MDB9.Q2FtYmlhLWVzdGEtZmlybWEtcGFyYS1wcm9iYXItNDAx';",
+                  "// JWT con formato válido armado en tiempo de ejecución (así Postman no lo toma como un secreto guardado).",
+                  "const b64url = (texto) => btoa(texto).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+                  "const cabecera = b64url(JSON.stringify({ alg: 'HS256' }));",
+                  "const carga = b64url(JSON.stringify({ iss: 'prestalab', sub: '1', rol: 'ADMIN', exp: 4102444800 }));",
+                  "const firma = b64url('Cambia-esta-firma-para-probar-401');",
+                  "const fijo = cabecera + '.' + carga + '.' + firma;",
+                  "// Se cambia su último carácter para alterar la firma.",
                   "const ultimo = fijo.charAt(fijo.length - 1);",
                   "pm.collectionVariables.set('tokenAlterado', fijo.slice(0, -1) + (ultimo === 'A' ? 'B' : 'A'));"
                 ]
