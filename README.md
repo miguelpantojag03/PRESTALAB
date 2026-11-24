@@ -20,6 +20,43 @@ Sistema de préstamo de equipos del laboratorio universitario. Tiene dos partes:
 Java 21 · Spring Boot 3.5 · Spring Security 6 (OAuth2 Resource Server, JWT HS256) · Spring Data MongoDB ·
 MongoDB 7 · Docker Compose · Thymeleaf (solo para las plantillas de correo) · React 18 · Vite · nginx.
 
+## Diagramas de arquitectura
+
+Las cinco vistas están hechas en UML con Visual Paradigm. El modelo editable es
+[PrestaLab-vistas.vpp](docs/diagramas/PrestaLab-vistas.vpp), y las cinco vistas juntas están en
+[PrestaLab-Diagramas.docx](docs/diagramas/PrestaLab-Diagramas.docx).
+
+### V1 · Vista de contexto
+
+El sistema, sus actores (estudiante, administrador y el reloj del sistema) y los sistemas externos: MongoDB y el
+servidor de correo.
+
+![V1 Vista de contexto](docs/diagramas/V1%20Vista%20de%20contexto.jpg)
+
+### V2 · Vista funcional
+
+Casos de uso RF01 a RF12 por actor. Los casos que cambian el estado de un préstamo incluyen el envío del correo (RF08).
+
+![V2 Vista funcional](docs/diagramas/V2%20Vista%20funcional.jpg)
+
+### V3 · Vista lógica
+
+Clases por capa: controladores, servicios con sus interfaces, repositorios, modelo de dominio y excepciones.
+
+![V3 Vista lógica](docs/diagramas/V3%20Vista%20l%C3%B3gica.jpg)
+
+### V4 · Vista de desarrollo
+
+Paquetes del backend y del frontend con sus dependencias permitidas, que se verifican con ArchUnit.
+
+![V4 Vista de desarrollo](docs/diagramas/V4%20Vista%20de%20desarrollo.jpg)
+
+### V5 · Vista de despliegue
+
+Los cuatro contenedores de Docker Compose (web, app, db y mail), la red, el volumen de datos y los puertos.
+
+![V5 Vista de despliegue](docs/diagramas/V5%20Vista%20de%20despliegue.jpg)
+
 ## Requisitos
 
 - JDK 21 y Maven 3.9
